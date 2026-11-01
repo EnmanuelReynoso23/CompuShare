@@ -258,7 +258,7 @@ const App = () => {
 
   const host = (() => {
     try {
-      return new URL(config.rele).host;
+      return config.rele ? new URL(config.rele).host : 'Kaggle';
     } catch {
       return config.rele;
     }

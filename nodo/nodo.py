@@ -22,6 +22,7 @@ from typing import Any
 from websockets.asyncio.client import ClientConnection, connect
 from websockets.exceptions import ConnectionClosed
 
+from fabric import descubrir
 from fabric.nodo import motores
 
 log = logging.getLogger("nodo")
@@ -95,7 +96,9 @@ class Nodo:
             self.en_curso.pop(ident, None)
 
     async def una_sesion(self) -> None:
-        async with connect(self.rele, max_size=8 * 1024 * 1024, open_timeout=20) as ws:
+        # 'buscar': el relé vive en un cuaderno de Kaggle y su dirección cambia; se busca cada vez.
+        url = await asyncio.to_thread(descubrir.rele, self.rele, self.clave, 600) if self.rele == "buscar" else self.rele
+        async with connect(url, max_size=8 * 1024 * 1024, open_timeout=20) as ws:
             self.ws = ws
             await ws.send(
                 json.dumps(
@@ -142,7 +145,7 @@ class Nodo:
             except PermissionError as e:
                 log.error("el relé no deja entrar: %s", e)
                 raise
-            except (OSError, ConnectionClosed, asyncio.TimeoutError) as e:
+            except (OSError, ConnectionClosed, asyncio.TimeoutError, RuntimeError) as e:
                 log.warning("conexión perdida (%s); reintento en %.0f s", e, espera)
             if time.monotonic() - inicio > 60:
                 espera = 1.0
@@ -176,6 +179,9 @@ async def correr(a: argparse.Namespace) -> Nodo:
     info = info_del_equipo()
     if a.llm_modelo:
         info["modelo"] = a.llm_modelo
+    for par in a.info:  # datos extra que se ven en la red (p. ej. capas en GPU, velocidad local)
+        k, _, v = par.partition("=")
+        info[k.strip()[:30]] = v.strip()[:120]
     nodo = Nodo(a.rele, a.clave, a.enjambre, a.nombre, armar_motores(a), info)
     vida = asyncio.create_task(nodo.vivir())
     try:
@@ -194,7 +200,7 @@ def argumentos(lista: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Nodo de la red de SynRAG")
     p.add_argument("--rele", default=os.environ.get("FABRIC_RELE", "ws://127.0.0.1:8095"))
     p.add_argument("--clave", default=os.environ.get("FABRIC_CLAVE", ""))
-    p.add_argument("--enjambre", default=os.environ.get("FABRIC_ENJAMBRE", "pruebas"))
+    p.add_argument("--enjambre", default=os.environ.get("FABRIC_ENJAMBRE", "publico"))
     p.add_argument("--nombre", default=platform.node()[:40])
     p.add_argument("--eco", action="store_true")
     p.add_argument("--llm-url", default="")
@@ -204,6 +210,7 @@ def argumentos(lista: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--reordenar", default="")
     p.add_argument("--dispositivo", default=None)
     p.add_argument("--duracion", type=float, default=0)
+    p.add_argument("--info", action="append", default=[], metavar="CLAVE=VALOR")
     return p.parse_args(lista)
 
 

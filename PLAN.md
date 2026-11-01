@@ -4,7 +4,8 @@
 
 | Qué | Estado |
 | --- | --- |
-| Repartir preguntas entre equipos (cada uno con su modelo completo) | FUNCIONA. Relé en Oracle + 2 cuadernos Kaggle (Qwen3.8-27B y Qwen3.6-35B-A3B) respondiendo de verdad. |
+| Repartir preguntas entre equipos (cada uno con su modelo completo) | FUNCIONA (probado con el relé en Oracle; 31-oct se sacó de Oracle). 2 cuadernos Kaggle (Qwen3.8-27B y Qwen3.6-35B-A3B) respondiendo de verdad. |
+| Dónde vive cada cosa | Web en Vercel. Relé dentro del cuaderno Kaggle `calidad`, con túnel rápido de Cloudflare; su dirección se publica en ntfy.sh bajo un tema que sale de la clave. NADA en Oracle (decisión del usuario, 31-oct). |
 | Dividir UN modelo entre 2 computadoras | NO EXISTE TODAVÍA. El "ring pipeline" de p2p-neural-fabric era simulado (tensores de `Math.sin`) y se borró. |
 | Búsqueda con embeddings en Kaggle | Falló por memoria en la GPU 0 (comparte con llama.cpp). Arreglado en el código; falta repetirla. |
 | Velocidad en Kaggle | Sospechosa: 27B a 5,1 tok/s con primer token a 115 s; 35B-A3B a 9 tok/s con primer token a 69 s. En 2 x T4 se esperaría bastante más. Hay que leer `llama-server.log` antes de seguir. |
@@ -24,11 +25,13 @@ Tres límites que mandan en el diseño:
 
 1. **El servidor RPC no tiene clave ni cifrado** (su README: no correrlo nunca en una red abierta).
    Solo puede escuchar en `127.0.0.1` y viajar por un túnel con autenticación.
-2. **Kaggle no acepta conexiones entrantes.** Dos cuadernos solo se hablan a través de un tercero:
-   Oracle hace de punto de encuentro.
-3. **Oracle es producción de AsistoYA.** La primera carga manda los pesos de la mitad remota por el
-   túnel (decenas de GB). Eso se hace fuera de horario escolar y con tope de ancho de banda; después,
-   la caché local del trabajador (`ggml-rpc-server -c`) evita repetirlo.
+2. **Kaggle no acepta conexiones entrantes.** Dos cuadernos se hablan por el relé, que ya vive en el
+   cuaderno A y sale por el túnel de Cloudflare: el trabajador B entra con la clave y el relé hace de
+   tubo TCP hacia el `llama-server` de A. Sin Oracle y sin servicios nuevos.
+3. **Los pesos pesan.** La primera carga mandaría la mitad remota del modelo (decenas de GB) por el
+   túnel. El trabajador baja el GGUF de Hugging Face por su cuenta y se le arma la caché de
+   `ggml-rpc-server -c` desde ese archivo, para que por el túnel solo viajen los estados de cada token.
+   Si eso no se puede, se mide cuánto tarda la transferencia antes de seguir.
 
 ## Fases
 
@@ -41,7 +44,7 @@ no da, se dice y se decide antes de seguir.
   capas en CPU, calentamiento contado como primer token, las dos pruebas compitiendo por la GPU.
 - Repetir la búsqueda con lotes de 8 (`PRUEBAS=busqueda`) para tener los aciertos en los puestos 1 y 5.
 - Repo PRIVADO en GitHub (`synrag-fabric`) y subir la rama `red-fabric`.
-- Rotar la clave del relé (va dentro del código de los cuadernos).
+- Rotar la clave del relé: HECHO 31-oct (clave nueva en `~/.config/synrag/fabric.env`).
 - Borrar los 6 cuadernos del 90 %, si lo confirmas.
 
 ### F1. Dividir dentro de un solo cuaderno (prueba del mecanismo, sin red)
@@ -53,13 +56,15 @@ no da, se dice y se decide antes de seguir.
   costo propio del RPC.
 - Éxito: misma respuesta y una caída de velocidad medida y pequeña.
 
-### F2. Túnel por Oracle
+### F2. Tubo TCP por el relé (sin Oracle)
 
-- `chisel` (TCP sobre WebSocket con usuario y clave), versión fija, detrás de Caddy en un subdominio
-  propio. Los puertos RPC quedan solo en el loopback de Oracle; nada público.
-- El trabajador abre `R:50052` (reverso) y el maestro lo usa como `127.0.0.1:50052`.
-- Medir la ida y vuelta Kaggle -> Oracle -> Kaggle y el CPU de Oracle durante una carga de pesos.
-- Tope de ancho de banda en el contenedor y horario permitido (noches y fines de semana).
+- Mensajes nuevos del relé: `tubo_abrir` / marcos binarios / `tubo_cerrar`, solo entre pares del mismo
+  enjambre y con la clave. En el cuaderno A el relé escucha en `127.0.0.1:50052` y pasa los bytes al
+  trabajador B, que los entrega a su `ggml-rpc-server` en `127.0.0.1`. Nada RPC queda público.
+- Pruebas automáticas: tubo de punta a punta en la misma máquina (eco TCP y un RPC de verdad con un
+  modelo diminuto).
+- Medir la ida y vuelta Kaggle -> Cloudflare -> Kaggle y el ancho de banda real del túnel.
+- Caché del trabajador armada desde su propio GGUF (verificar el formato de la caché de llama.cpp).
 
 ### F3. Una IA en dos computadoras (el objetivo)
 
@@ -82,7 +87,7 @@ no da, se dice y se decide antes de seguir.
 
 ### F5. Más computadoras
 
-- Tu PC (CachyOS, 4 GB de VRAM) como trabajador por el mismo túnel: aporta pocas capas; sirve para
+- Tu PC (CachyOS, 4 GB de VRAM) como trabajador por el mismo relé: aporta pocas capas; sirve para
   probar con una máquina que no es de Kaggle.
 - Script `fabric-nodo` para cualquier Linux con GPU: baja llama.cpp, abre el túnel y entra al relé.
 
@@ -104,13 +109,15 @@ no da, se dice y se decide antes de seguir.
 - [ ] Un modelo que no cabe en una máquina responde, repartido entre 2 computadoras distintas.
 - [ ] Ese modelo aparece en la web y en `preguntar_red` como un nodo más.
 - [ ] Velocidad y aciertos medidos y escritos (también si son malos).
-- [ ] Nada inseguro expuesto: RPC solo por túnel con clave; Oracle sin afectar a AsistoYA.
+- [ ] Nada inseguro expuesto: RPC solo por el relé con clave; nada en Oracle.
 - [ ] Se levanta con un comando (`lanzar.py --dividido`) y se recupera si un equipo se cae.
-- [ ] Repo privado en GitHub con `LEEME.md` y este plan al día.
+- [ ] Repo privado en GitHub con `LEEME.md` y este plan al día; web publicada en Vercel.
 
 ## Decisiones tuyas
 
-1. ¿Dónde vive la web? En Oracle (Caddy sirve `fabric/web/dist`) o en Vercel como synrag.vercel.app.
-2. ¿Enjambre privado (solo con clave) o abierto a donantes (F7)?
-3. ¿Se permite pasar pesos por Oracle (F2/F3) en noches y fines de semana?
-4. ¿Borro los 6 cuadernos del 90 %?
+Decidido 31-oct: web en Vercel, relé en Kaggle, nada en Oracle (relé y bloque de Caddy ya quitados).
+
+1. ¿Enjambre privado (solo con clave) o abierto a donantes (F7)?
+2. ¿Borro los 6 cuadernos del 90 %?
+3. Límite conocido: el relé vive mientras corra el cuaderno `calidad` (Kaggle corta a las 12 h y da
+   30 h de GPU por semana). Fuera de esas horas la web dice "la red está apagada".

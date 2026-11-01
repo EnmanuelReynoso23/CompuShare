@@ -5,8 +5,9 @@
     python fabric/kaggle/lanzar.py --estado      # cómo van
     python fabric/kaggle/lanzar.py --bajar DIR   # traer logs y resumen.json
 
-Lee el relé y la clave de ~/.config/synrag/fabric.env (FABRIC_RELE, FABRIC_CLAVE).
-Los cuadernos son PRIVADOS: la clave va dentro del código del cuaderno.
+Lee la clave de ~/.config/synrag/fabric.env (FABRIC_CLAVE). El cuaderno `calidad` aloja el relé
+(túnel de Cloudflare) y publica su dirección; los demás la buscan (fabric/descubrir.py). Nada pasa
+por Oracle. Los cuadernos son PRIVADOS: la clave va dentro del código del cuaderno.
 """
 
 from __future__ import annotations
@@ -26,12 +27,14 @@ AQUI = Path(__file__).resolve().parent
 RAIZ = AQUI.parent.parent  # raíz del repo (la que contiene fabric/)
 USUARIO = os.environ.get("KAGGLE_USUARIO", "enmanuelreynoso")
 LLAMA_CPP = "b12024"  # release de llama.cpp con binarios CUDA 12.8 (31-oct-2026)
+CLOUDFLARED = "2026.10.0"  # túnel del relé; versión fija con semanas de uso
 
 NODOS = {
     # El más nuevo que cabe en 2 x T4 (30 GB): denso, mejor calidad, más lento.
     # Además hace embeddings y reordenado (le sobra VRAM).
     "calidad": {
         "nombre": "kaggle-qwen3.8-27b",
+        "rele": "aqui",  # este cuaderno aloja el relé; dura 10 min más que los otros
         "modelo_repo": "unsloth/Qwen3.8-27B-GGUF",
         "modelo_archivo": "Qwen3.8-27B-UD-Q4_K_M.gguf",
         "modelo_nombre": "Qwen3.8-27B",
@@ -43,6 +46,7 @@ NODOS = {
     # MoE con 3B activos: casi tan bueno y varias veces más rápido.
     "rapido": {
         "nombre": "kaggle-qwen3.6-35b-a3b",
+        "rele": "buscar",
         "modelo_repo": "unsloth/Qwen3.6-35B-A3B-GGUF",
         "modelo_archivo": "Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
         "modelo_nombre": "Qwen3.6-35B-A3B",
@@ -66,7 +70,8 @@ def entorno_red() -> dict[str, str]:
 def codigo_empaquetado() -> str:
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz") as tar:
-        for ruta in ["fabric/__init__.py", "fabric/cliente.py", "fabric/nodo/__init__.py", "fabric/nodo/nodo.py", "fabric/nodo/motores.py"]:
+        for ruta in ["fabric/__init__.py", "fabric/cliente.py", "fabric/descubrir.py", "fabric/nodo/__init__.py",
+                     "fabric/nodo/nodo.py", "fabric/nodo/motores.py", "fabric/rele/__init__.py", "fabric/rele/rele.py"]:
             tar.add(RAIZ / ruta, arcname=ruta)
     return base64.b64encode(buf.getvalue()).decode()
 
@@ -77,8 +82,10 @@ def slug(clave: str) -> str:
 
 def lanzar(clave: str, duracion_min: int, enjambre: str) -> None:
     red = entorno_red()
-    config = dict(NODOS[clave], rele=red["FABRIC_RELE"], clave=red["FABRIC_CLAVE"], enjambre=enjambre,
-                  duracion_min=duracion_min, llama_cpp=LLAMA_CPP)
+    if NODOS[clave]["rele"] == "aqui":
+        duracion_min += 10
+    config = dict(NODOS[clave], clave=red["FABRIC_CLAVE"], enjambre=enjambre,
+                  duracion_min=duracion_min, llama_cpp=LLAMA_CPP, cloudflared=CLOUDFLARED)
     script = (AQUI / "nodo_kaggle.py").read_text()
     script = script.replace("__CONFIG__", base64.b64encode(json.dumps(config).encode()).decode())
     script = script.replace("__CODIGO__", codigo_empaquetado())
@@ -128,4 +135,4 @@ if __name__ == "__main__":
         cuales = [a for a in args if a in NODOS] or list(NODOS)
         duracion = int(os.environ.get("DURACION_MIN", "50"))
         for clave in cuales:
-            lanzar(clave, duracion, os.environ.get("FABRIC_ENJAMBRE", "pruebas"))
+            lanzar(clave, duracion, os.environ.get("FABRIC_ENJAMBRE", "publico"))

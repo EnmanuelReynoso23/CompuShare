@@ -399,7 +399,9 @@ class Rele:
         if pedido.path.split("?")[0] != "/salud":
             return None
         cuerpo = json.dumps(self.resumen()).encode()
-        cabeceras = Headers([("Content-Type", "application/json"), ("Content-Length", str(len(cuerpo)))])
+        # Abierto a cualquier origen: la web (Vercel) lo consulta para saber si este relé sigue vivo.
+        cabeceras = Headers([("Content-Type", "application/json"), ("Content-Length", str(len(cuerpo))),
+                             ("Access-Control-Allow-Origin", "*")])
         return Response(HTTPStatus.OK.value, "OK", cabeceras, cuerpo)
 
 

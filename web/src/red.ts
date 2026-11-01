@@ -1,5 +1,6 @@
 // Conexión con el relé de la red (mismo protocolo que fabric/rele/rele.py).
-// Sustituye a Appwrite (tablas nodes/signals/messages) y a la señalización WebRTC:
+// Sustituye a Appwrite (tablas nodes/signals/messages) y a la señalización WebRTC.
+// El relé corre dentro de un cuaderno de Kaggle; si no hay ?rele=, se busca (buscarRele):
 // el relé guarda en memoria quién está, reparte las tareas al nodo con menos
 // carga y mantiene la sala de chat del enjambre.
 
@@ -79,7 +80,8 @@ export function leerConfig(): ConfigRed {
   }
   const url = new URLSearchParams(window.location.search);
   const config: ConfigRed = {
-    rele: url.get('rele') || guardada.rele || import.meta.env.VITE_FABRIC_RELE || 'wss://fabric.132-145-194-200.sslip.io',
+    // Vacío = buscar el relé que publicó el cuaderno de Kaggle que lo aloja (ver buscarRele).
+    rele: url.get('rele') || import.meta.env.VITE_FABRIC_RELE || '',
     clave: url.get('clave') || guardada.clave || import.meta.env.VITE_FABRIC_CLAVE || '',
     enjambre: (url.get('enjambre') || guardada.enjambre || 'publico').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 40) || 'publico',
   };
@@ -89,6 +91,35 @@ export function leerConfig(): ConfigRed {
     /* sin almacenamiento: se usa solo en esta pestaña */
   }
   return config;
+}
+
+const NTFY = 'https://ntfy.sh';
+
+/** Mismo tema que fabric/descubrir.py: sale de la clave, así que solo quien la tiene sabe dónde mirar. */
+async function temaDeLaClave(clave: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`synrag-red:${clave}`));
+  const hex = Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
+  return `synrag-red-${hex.slice(0, 24)}`;
+}
+
+/** El relé vive en un cuaderno de Kaggle con un túnel que cambia en cada arranque: la dirección más nueva que siga viva. */
+export async function buscarRele(clave: string): Promise<string | null> {
+  const r = await fetch(`${NTFY}/${await temaDeLaClave(clave)}/json?poll=1&since=12h`);
+  const urls = (await r.text())
+    .split('\n')
+    .filter((l) => l.trim())
+    .map((l) => JSON.parse(l) as { event?: string; message?: string })
+    .filter((m) => m.event === 'message' && m.message?.startsWith('wss://'))
+    .map((m) => m.message as string);
+  for (const url of urls.reverse()) {
+    try {
+      const salud = await fetch(`https://${url.slice('wss://'.length)}/salud`, { signal: AbortSignal.timeout(8000) });
+      if (salud.ok) return url;
+    } catch {
+      /* cuaderno ya apagado: la siguiente */
+    }
+  }
+  return null;
 }
 
 /** Identidad anónima de este navegador (ya no hay sesión de Appwrite). */
@@ -220,12 +251,12 @@ export class Red {
       this.ws = null;
       vieja.onclose = () => {
         this.rechazarPendientes();
-        this.abrir();
+        void this.abrir();
       };
       vieja.close();
       return;
     }
-    this.abrir();
+    void this.abrir();
   }
 
   private rechazarPendientes() {
@@ -234,9 +265,19 @@ export class Red {
     this.pendientes.clear();
   }
 
-  private abrir() {
+  private async abrir() {
     const comoNodo = this.comoNodo;
-    const ws = new WebSocket(this.config.rele);
+    let url = this.config.rele;
+    if (!url) {
+      url = (await buscarRele(this.config.clave).catch(() => null)) ?? '';
+      if (!url) {
+        this.eventos.alDesconectar?.('la red está apagada: no hay ningún cuaderno de Kaggle con el relé');
+        if (!this.cerrada) setTimeout(() => void this.abrir(), 30000);
+        return;
+      }
+    }
+    if (this.cerrada) return;
+    const ws = new WebSocket(url);
     this.ws = ws;
     ws.onopen = () => {
       ws.send(
@@ -258,7 +299,7 @@ export class Red {
       this.rechazarPendientes();
       this.eventos.alDesconectar?.(e.reason || 'sin conexión');
       if (this.cerrada || e.reason === 'clave incorrecta') return;
-      setTimeout(() => this.abrir(), this.espera);
+      setTimeout(() => void this.abrir(), this.espera);
       this.espera = Math.min(this.espera * 2, 30000);
     };
   }

@@ -232,3 +232,13 @@ def test_reconexion_conserva_el_id():
 
     asyncio.run(caso())
 
+
+
+def test_descubrir_usa_la_direccion_fija_o_busca(monkeypatch):
+    from fabric import descubrir
+
+    assert descubrir.rele("ws://127.0.0.1:9", "k") == "ws://127.0.0.1:9"
+    monkeypatch.setattr(descubrir, "ultimo", lambda clave: "wss://x.trycloudflare.com")
+    assert descubrir.rele("buscar", "k") == "wss://x.trycloudflare.com"
+    assert descubrir.rele("", "k") == "wss://x.trycloudflare.com"
+    assert descubrir.tema("k") == descubrir.tema("k") != descubrir.tema("otra")

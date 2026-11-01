@@ -62,6 +62,54 @@ sys.path.insert(0, f"{TRABAJO}/codigo")
 sh(f"{sys.executable} -m pip install -q 'websockets>=15' 'httpx>=0.27'")
 etapa("codigo", t)
 
+# ── 1b. el relé vive en este cuaderno (si le toca) ─────────────────────────
+# Kaggle no acepta conexiones entrantes: el relé sale por un túnel rápido de Cloudflare
+# (https://*.trycloudflare.com, cambia en cada arranque) y la dirección se publica en ntfy.sh
+# bajo un tema que sale de la clave (fabric/descubrir.py).
+RELE_LOCAL = "ws://127.0.0.1:8095"
+if CONFIG["rele"] == "aqui":
+    import re  # noqa: E402
+
+    from fabric import descubrir  # noqa: E402
+
+    t = time.time()
+    rele_log = open(f"{SALIDA}/rele.log", "w")
+    proceso_rele = subprocess.Popen(
+        [sys.executable, "rele.py"], cwd=f"{TRABAJO}/codigo/fabric/rele", stdout=rele_log, stderr=subprocess.STDOUT,
+        env=dict(os.environ, FABRIC_CLAVE=CONFIG["clave"], PUERTO="8095"),
+    )
+    binario_cf = f"{TRABAJO}/cloudflared"
+    urllib.request.urlretrieve(
+        f"https://github.com/cloudflare/cloudflared/releases/download/{CONFIG['cloudflared']}/cloudflared-linux-amd64", binario_cf
+    )
+    os.chmod(binario_cf, 0o755)
+    cf_log_ruta = f"{SALIDA}/cloudflared.log"
+    cf_log = open(cf_log_ruta, "w")
+    proceso_cf = subprocess.Popen(
+        [binario_cf, "tunnel", "--no-autoupdate", "--url", "http://127.0.0.1:8095"], stdout=cf_log, stderr=subprocess.STDOUT
+    )
+    publico = None
+    for _ in range(120):
+        m = re.search(r"https://[a-z0-9-]+\.trycloudflare\.com", open(cf_log_ruta).read())
+        if m:
+            publico = m.group(0)
+            break
+        time.sleep(1)
+    if not publico:
+        raise SystemExit("cloudflared no dio dirección; ver cloudflared.log")
+    for _ in range(60):  # el nombre tarda unos segundos en resolver
+        try:
+            with urllib.request.urlopen(publico + "/salud", timeout=5) as rr:
+                if rr.status == 200:
+                    break
+        except Exception:
+            time.sleep(2)
+    url_publica = "wss://" + publico.removeprefix("https://")
+    descubrir.publicar(url_publica, CONFIG["clave"])
+    resumen["rele_publico"] = url_publica
+    log("relé publicado en", url_publica)
+    etapa("rele", t)
+
 # ── 2 y 3 en paralelo: llama.cpp y el modelo ───────────────────────────────
 estado = {}
 
@@ -176,6 +224,26 @@ if not listo:
 etapa("llama_server", t)
 log("VRAM en uso:", sh("nvidia-smi --query-gpu=memory.used,memory.total --format=csv,noheader").stdout.strip())
 
+# ── 4b. diagnóstico: capas en GPU y velocidad medida aquí mismo, sin red ───
+diagnostico = {"llama": str(estado.get("llama_origen"))}
+for linea in open(f"{SALIDA}/llama-server.log", errors="replace"):
+    if "offloaded" in linea:
+        diagnostico["capas_gpu"] = linea.strip().split("offloaded", 1)[1].strip()[:60]
+try:
+    pedido = urllib.request.Request(
+        "http://127.0.0.1:8080/completion",
+        data=json.dumps({"prompt": "Explica en tres frases qué es un índice invertido.", "n_predict": 128}).encode(),
+        headers={"Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(pedido, timeout=600) as rr:
+        tiempos = json.load(rr).get("timings", {})
+    diagnostico["local_tok_s"] = round(tiempos.get("predicted_per_second", 0), 1)
+    diagnostico["local_prompt_tok_s"] = round(tiempos.get("prompt_per_second", 0), 1)
+except Exception as e:
+    diagnostico["local_error"] = repr(e)[:100]
+resumen["diagnostico"] = diagnostico
+log("diagnóstico:", diagnostico)
+
 # ── 5. dentro de la red ─────────────────────────────────────────────────────
 import asyncio  # noqa: E402
 import logging  # noqa: E402
@@ -184,7 +252,7 @@ from fabric.nodo.nodo import argumentos, correr  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 args = [
-    "--rele", CONFIG["rele"],
+    "--rele", RELE_LOCAL if CONFIG["rele"] == "aqui" else "buscar",
     "--clave", CONFIG["clave"],
     "--enjambre", CONFIG["enjambre"],
     "--nombre", CONFIG["nombre"],
@@ -194,6 +262,8 @@ args = [
     "--llm-concurrencia", str(CONFIG["paralelo"]),
     "--duracion", str(CONFIG["duracion_min"] * 60),
 ]
+for k, v in diagnostico.items():
+    args += ["--info", f"{k}={v}"]
 if CONFIG.get("embeber"):
     args += ["--embeber", CONFIG["embeber"]]
 if CONFIG.get("reordenar"):

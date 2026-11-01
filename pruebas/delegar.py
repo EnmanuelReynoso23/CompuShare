@@ -27,6 +27,7 @@ import sys
 import time
 from pathlib import Path
 
+from fabric import descubrir
 from fabric.cliente import ClienteRed, ErrorRed
 
 RAIZ = Path(__file__).resolve().parents[2]
@@ -249,9 +250,12 @@ def informe(res: dict) -> str:
 
 
 async def principal(carpeta: Path) -> None:
-    rele, clave = os.environ["FABRIC_RELE"], os.environ["FABRIC_CLAVE"]
-    enjambre = os.environ.get("FABRIC_ENJAMBRE", "pruebas")
+    clave = os.environ["FABRIC_CLAVE"]
+    enjambre = os.environ.get("FABRIC_ENJAMBRE", "publico")
     espera = float(os.environ.get("ESPERA_NODOS_S", "2400"))
+    log("buscando el relé...")
+    rele = await asyncio.to_thread(descubrir.rele, os.environ.get("FABRIC_RELE"), clave, espera)
+    log("relé:", rele)
     res: dict = {"fecha": time.strftime("%Y-%m-%d %H:%M"), "errores": {}}
     async with ClienteRed(rele, clave, enjambre, nombre="delegador") as red:
         log("esperando nodos con generar (2) y embeber (1)...")
