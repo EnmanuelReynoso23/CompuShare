@@ -242,3 +242,48 @@ def test_descubrir_usa_la_direccion_fija_o_busca(monkeypatch):
     assert descubrir.rele("buscar", "k") == "wss://x.trycloudflare.com"
     assert descubrir.rele("", "k") == "wss://x.trycloudflare.com"
     assert descubrir.tema("k") == descubrir.tema("k") != descubrir.tema("otra")
+
+
+def test_tubo_lleva_bytes_ida_y_vuelta():
+    """Un 'ggml-rpc-server' de mentira (eco TCP) detrás del tubo: 5 MB van y vuelven intactos."""
+    import os as _os
+
+    from fabric.tubo import Tubo
+
+    async def eco(lector, escritor):
+        while datos := await lector.read(65536):
+            escritor.write(datos)
+            await escritor.drain()
+        escritor.close()
+
+    async def caso():
+        servidor_eco = await asyncio.start_server(eco, "127.0.0.1", 0)
+        puerto_eco = servidor_eco.sockets[0].getsockname()[1]
+        async with red() as (url, _c, _n):
+            tubo = Tubo(url, CLAVE, "trabajador-1", puerto_eco)
+            vida = asyncio.create_task(tubo.vivir())
+            try:
+                await asyncio.wait_for(tubo.listo.wait(), 5)
+                lector, escritor = await asyncio.open_connection("127.0.0.1", tubo.puerto_remoto)
+                carga = _os.urandom(5 * 1024 * 1024)
+                escritor.write(carga)
+                await escritor.drain()
+                vuelta = await asyncio.wait_for(lector.readexactly(len(carga)), 20)
+                assert vuelta == carga
+                escritor.close()
+            finally:
+                vida.cancel()
+                servidor_eco.close()
+
+    asyncio.run(caso())
+
+
+def test_tubo_rechaza_clave_mala():
+    async def caso():
+        async with red() as (url, _c, _n):
+            async with connect(url + "/tubo") as ws:
+                await ws.send(json.dumps({"t": "ofrezco", "clave": "otra", "nombre": "x"}))
+                with pytest.raises(Exception):
+                    await asyncio.wait_for(ws.recv(), 3)
+
+    asyncio.run(caso())
