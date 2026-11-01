@@ -33,19 +33,25 @@ Dónde corre:
    10 procesos repartidos entre las 2 GPU, con la red falsa en el intermediario. El cálculo es GPU
    real; la red es simulada con los perfiles de arriba.
 
-## Escenarios
+## Escenarios (ajustado al pedido del usuario, 31-oct noche)
 
-- **A. Una IA dividida en 10** (lo que pidió el usuario): un solo modelo repartido en 10 partes, una
-  por computadora, en fila. El maestro escribe el cuento capítulo por capítulo. Muestra cuánto cuesta
-  cada salto: 10 computadoras = 10 saltos por cada pasada.
-- **B. 10 computadoras, cada una con su modelo** (comparación): el maestro arma el esquema del cuento y
-  reparte capítulos; cada computadora escribe los suyos con el resumen de lo anterior.
-- **C. A + adivinador** (MTP, como hoy): el mismo A con decodificación especulativa, para ver cuánto
-  recupera.
+Idea del usuario: EL MISMO modelo en las 10 computadoras a la vez, sumando su CPU, GPU y RAM, para que
+corra en equipos que solos no podrían. Nada de islas.
 
-Modelo candidato: Qwen3.5-9B-MTP Q8 (el de hoy; ya probado por RPC) para A y C. Para B, el mismo modelo
-entero en cada computadora no cabe 10 veces en 30 GB: se usa Qwen3.5-2B o 4B (verificar en Hugging Face
-el día de la prueba).
+- Cada computadora simulada es "débil": límite de ~2-3 GB para su parte (`--tensor-split` en partes
+  iguales) y algunas solo con CPU (`ggml-rpc-server -d CPU -t 2`).
+- Modelo que no cabe en ninguna sola: Qwen3.8-27B UD-Q4_K_M (16,5 GB) repartido en 10 (~1,7 GB cada una
+  más caché KV). Respaldo: Qwen3.5-9B-MTP Q8 (9,8 GB, probado el 31-oct).
+
+- **A. Un capítulo a la vez**: las 10 en fila; cada palabra pasa por todas. Muestra el costo de cada salto.
+- **B. Varios capítulos a la vez con el mismo modelo dividido** (`--parallel N` en llama-server): mientras
+  la computadora 10 termina una palabra del capítulo 1, la 1 ya calcula el capítulo 2; así trabajan
+  todas al mismo tiempo. Medir velocidad total con N = 1, 4, 8.
+- **C. A y B con el adivinador** (MTP), si el modelo elegido lo trae.
+
+Estimación previa (con las cifras del 31-oct: ~45 ms de cálculo por palabra + 1 ida y vuelta por salto),
+escenario A, 40.000 tokens: misma ciudad ~1 h 40 min, mismo país ~5 h, otro continente ~14 h. B debería
+multiplicar la velocidad total por casi N mientras la red aguante.
 
 ## Qué hay que construir
 
@@ -65,6 +71,6 @@ el día de la prueba).
 
 ## Decisiones del usuario
 
-1. ¿Incluyo el escenario B como comparación, o solo A y C?
+1. (Resuelto: el mismo modelo dividido en las 10; B = varios capítulos a la vez.)
 2. ¿Usamos tiempo de GPU de Kaggle para la prueba real? 30 h/semana, quedan ~27 h; esta prueba usa 1
    cuaderno por ~3 h.
