@@ -251,7 +251,8 @@ def trabajador():
     log(f"ggml-rpc-server en 127.0.0.1:50052 con {dispositivos}")
 
     async def vivir():
-        tubo = Tubo("buscar", CONFIG["clave"], CONFIG["tubo"], 50052)
+        vram = round(sum(float(g[1].split()[0]) for g in gpus) / 1024, 1) if gpus else 0
+        tubo = Tubo("buscar", CONFIG["clave"], CONFIG["tubo"], 50052, info={"vram_gb": vram})
         tarea = asyncio.create_task(tubo.vivir())
         fin = time.time() + CONFIG["duracion_min"] * 60
         while time.time() < fin and proceso.poll() is None:
@@ -276,23 +277,44 @@ if ROL == "trabajador":
     log("fin")
     sys.exit(0)
 
-# ── 4m. maestro: espera al trabajador ───────────────────────────────────────
+# ── 4m. maestro: espera a los trabajadores y elige cuáles usar (fabric/reparto.py) ─
 puerto_tubo = None
+rpc = []
 if ROL == "maestro":
+    from fabric import reparto
+
     t = time.time()
+    prefijo = CONFIG.get("tubo_prefijo", "trabajador-")
+    minimo = CONFIG.get("trabajadores_min", 1)
     limite = time.time() + CONFIG.get("espera_trabajador_min", 45) * 60
-    while time.time() < limite and not puerto_tubo:
+    tubos, gracia = {}, None
+    while time.time() < limite:
         try:
-            puerto_tubo = (salud_local().get("tubos", {}).get(CONFIG["tubo"]) or {}).get("puerto")
+            tubos = {n: d for n, d in salud_local().get("tubos", {}).items() if n.startswith(prefijo)}
         except Exception:
             pass
-        if not puerto_tubo:
-            time.sleep(5)
-    if not puerto_tubo:
-        resumen["error"] = f"el trabajador {CONFIG['tubo']} no apareció"
+        if len(tubos) >= minimo:
+            gracia = gracia or time.time() + CONFIG.get("gracia_s", 60)  # por si llegan más
+            if time.time() >= gracia:
+                break
+        time.sleep(5)
+    candidatos = [reparto.Candidato(n, d["puerto"], float((d.get("info") or {}).get("vram_gb", 0)))
+                  for n, d in tubos.items()]
+    for cand in candidatos:
+        cand.rtt_ms = reparto.medir_rtt(cand.puerto)
+    resumen["trabajadores"] = {cand.nombre: {"vram_gb": cand.vram_gb, "rtt_ms": round(cand.rtt_ms, 1)} for cand in candidatos}
+    log("trabajadores:", resumen["trabajadores"])
+    propio_gb = sum(float(g[1].split()[0]) for g in gpus) / 1024 if gpus else 0
+    try:
+        elegidos = reparto.elegir(candidatos, os.path.getsize(estado["modelo"]) / 1e9, propio_gb, minimo=minimo)
+    except ValueError as e:
+        resumen["error"] = str(e)
         guardar_resumen()
         raise SystemExit(resumen["error"])
-    log(f"trabajador {CONFIG['tubo']} conectado: su ggml-rpc-server está en 127.0.0.1:{puerto_tubo}")
+    rpc = [f"127.0.0.1:{cand.puerto}" for cand in elegidos]
+    puerto_tubo = rpc[0] if rpc else None
+    resumen["elegidos"] = [cand.nombre for cand in elegidos]
+    log("elegidos:", resumen["elegidos"])
     etapa("esperar_trabajador", t)
     tubo_antes = salud_local()["tubo_bytes"]
 
@@ -309,8 +331,10 @@ comando = [
     "--parallel", str(CONFIG["paralelo"]),
     "--jinja",
 ]
-if puerto_tubo:
-    comando += ["--rpc", f"127.0.0.1:{puerto_tubo}"]
+if rpc:
+    comando += ["--rpc", ",".join(rpc)]
+if CONFIG.get("especulativo"):
+    comando += ["--spec-type", CONFIG["especulativo"]]
 log("arrancando:", " ".join(comando[1:]))
 registro = open(f"{SALIDA}/llama-server.log", "w")
 servidor = subprocess.Popen(comando, stdout=registro, stderr=subprocess.STDOUT, env=entorno, cwd=os.path.dirname(binario))
@@ -348,7 +372,8 @@ for linea in open(f"{SALIDA}/llama-server.log", errors="replace"):
 if reparto:
     diagnostico["reparto"] = " ".join(reparto)
 if puerto_tubo:
-    diagnostico["equipos"] = 2
+    diagnostico["equipos"] = 1 + len(rpc)
+    diagnostico["rtt_ms"] = " ".join(f"{v['rtt_ms']}" for k, v in resumen["trabajadores"].items() if k in resumen["elegidos"])
     diagnostico["tubo_carga_mb"] = round((salud_local()["tubo_bytes"] - tubo_antes) / 1e6, 1)
     tubo_antes = salud_local()["tubo_bytes"]
 try:
@@ -361,6 +386,8 @@ try:
         tiempos = json.load(rr).get("timings", {})
     diagnostico["local_tok_s"] = round(tiempos.get("predicted_per_second", 0), 1)
     diagnostico["local_prompt_tok_s"] = round(tiempos.get("prompt_per_second", 0), 1)
+    if tiempos.get("draft_n"):
+        diagnostico["aciertos_mtp"] = f"{tiempos.get('draft_n_accepted', 0)}/{tiempos['draft_n']}"
     if puerto_tubo and tiempos.get("predicted_n"):
         n = tiempos["predicted_n"] + tiempos.get("prompt_n", 0)
         diagnostico["tubo_kb_por_token"] = round((salud_local()["tubo_bytes"] - tubo_antes) / 1e3 / n, 1)

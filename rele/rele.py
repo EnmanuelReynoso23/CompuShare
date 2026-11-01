@@ -114,6 +114,7 @@ class Oferta:
     servidor: Any = None
     abiertos: int = 0
     esperando: dict[str, asyncio.Future] = field(default_factory=dict)
+    info: dict = field(default_factory=dict)  # lo que el trabajador dice prestar (p. ej. vram_gb)
 
 
 @dataclass
@@ -189,7 +190,8 @@ class Rele:
             "tareas_en_curso": len(self.tareas),
             "tareas_atendidas": self.tareas_atendidas,
             "enjambres": enjambres,
-            "tubos": {o.nombre: {"puerto": o.puerto, "abiertos": o.abiertos} for o in self.ofertas.values()},
+            "tubos": {o.nombre: {"puerto": o.puerto, "abiertos": o.abiertos, "info": o.info}
+                      for o in self.ofertas.values()},
             "tubo_bytes": self.tubo_bytes,
         }
 
@@ -407,7 +409,9 @@ class Rele:
             await ws.close(1008, "clave incorrecta")
             return
         if m.get("t") == "ofrezco":
-            await self.ofrecer(ws, str(m.get("nombre") or ""))
+            info = m.get("info") if isinstance(m.get("info"), dict) else {}
+            info = {str(k)[:30]: v for k, v in list(info.items())[:10] if isinstance(v, (int, float, str))}
+            await self.ofrecer(ws, str(m.get("nombre") or ""), info)
         elif m.get("t") == "datos":
             esperando = next((o.esperando.pop(str(m.get("id")), None) for o in self.ofertas.values()
                               if str(m.get("id")) in o.esperando), None)
@@ -420,7 +424,7 @@ class Rele:
         else:
             await ws.close(1008, "tubo inválido")
 
-    async def ofrecer(self, ws: ServerConnection, nombre: str) -> None:
+    async def ofrecer(self, ws: ServerConnection, nombre: str, info: dict | None = None) -> None:
         if not ENJAMBRE_VALIDO.match(nombre):
             await ws.close(1008, "nombre inválido")
             return
@@ -429,7 +433,7 @@ class Rele:
             vieja.servidor.close()
         usados = {o.puerto for o in self.ofertas.values()}
         puerto = next(p for p in range(TUBO_PUERTO_BASE, TUBO_PUERTO_BASE + 100) if p not in usados)
-        oferta = Oferta(nombre=nombre, control=ws, puerto=puerto)
+        oferta = Oferta(nombre=nombre, control=ws, puerto=puerto, info=info or {})
         oferta.servidor = await asyncio.start_server(
             lambda lector, escritor: self.abrir_tubo(oferta, lector, escritor), "127.0.0.1", puerto
         )

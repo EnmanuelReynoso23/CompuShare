@@ -64,11 +64,15 @@ NODOS = {
         "rol": "maestro",
         "nombre": "kaggle-qwen3.5-9b-2-equipos",
         "rele": "aqui",
-        "tubo": "trabajador-1",
+        "tubo_prefijo": "trabajador-",
+        "trabajadores_min": 1,  # el 9B cabría solo en el maestro: se obliga a usar al trabajador
         "espera_trabajador_min": 45,
-        "modelo_repo": "unsloth/Qwen3.5-9B-GGUF",
+        "modelo_repo": "unsloth/Qwen3.5-9B-MTP-GGUF",
         "modelo_archivo": "Qwen3.5-9B-Q8_0.gguf",
         "modelo_nombre": "Qwen3.5-9B (2 equipos)",
+        # Decodificación especulativa con la cabeza MTP del propio modelo: adivina varios tokens y
+        # los confirma en UNA pasada por la red (en local: 79 % de aciertos, 3,25 tokens por pasada).
+        "especulativo": "draft-mtp",
         "embeber": "",
         "reordenar": "",
         "contexto": 16384,
@@ -79,7 +83,7 @@ NODOS = {
         "nombre": "kaggle-trabajador-1",
         "rele": "buscar",
         "tubo": "trabajador-1",
-        "modelo_repo": "unsloth/Qwen3.5-9B-GGUF",
+        "modelo_repo": "unsloth/Qwen3.5-9B-MTP-GGUF",
         "modelo_archivo": "Qwen3.5-9B-Q8_0.gguf",
         "modelo_nombre": "",
         "embeber": "",
@@ -122,7 +126,10 @@ def lanzar(clave: str, duracion_min: int, enjambre: str) -> None:
         duracion_min += 15  # el maestro espera al trabajador; el trabajador debe durar más que el maestro
     if NODOS[clave].get("rol") == "trabajador":
         duracion_min += 15
-    config = dict(NODOS[clave], clave=red["FABRIC_CLAVE"], enjambre=enjambre,
+    nodo = dict(NODOS[clave])
+    if os.environ.get("SIN_MTP") and nodo.get("especulativo"):
+        nodo["especulativo"] = ""  # para comparar contra el mismo modelo sin adivinar
+    config = dict(nodo, clave=red["FABRIC_CLAVE"], enjambre=enjambre,
                   duracion_min=duracion_min, llama_cpp=LLAMA_CPP, cloudflared=CLOUDFLARED)
     script = (AQUI / "nodo_kaggle.py").read_text()
     script = script.replace("__CONFIG__", base64.b64encode(json.dumps(config).encode()).decode())

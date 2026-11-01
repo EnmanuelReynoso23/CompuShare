@@ -27,12 +27,14 @@ MAX_MENSAJE = 8 * 1024 * 1024
 
 
 class Tubo:
-    def __init__(self, rele: str, clave: str, nombre: str, puerto: int, host: str = "127.0.0.1") -> None:
+    def __init__(self, rele: str, clave: str, nombre: str, puerto: int, host: str = "127.0.0.1",
+                 info: dict | None = None) -> None:
         self.rele = rele
         self.clave = clave
         self.nombre = nombre
         self.puerto = puerto
         self.host = host
+        self.info = info or {}
         self.puerto_remoto: int | None = None
         self.bytes = 0
         self.conexiones = 0
@@ -57,7 +59,7 @@ class Tubo:
     async def _una_sesion(self) -> None:
         url = await self._url()
         async with connect(url, max_size=MAX_MENSAJE, open_timeout=30, compression=None) as control:
-            await control.send(json.dumps({"t": "ofrezco", "clave": self.clave, "nombre": self.nombre}))
+            await control.send(json.dumps({"t": "ofrezco", "clave": self.clave, "nombre": self.nombre, "info": self.info}))
             hola = json.loads(await asyncio.wait_for(control.recv(), timeout=20))
             if hola.get("t") != "listo":
                 raise RuntimeError(f"el relé no aceptó el tubo: {hola}")
@@ -116,10 +118,11 @@ def argumentos(lista: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--clave", default=os.environ.get("FABRIC_CLAVE", ""))
     p.add_argument("--nombre", required=True)
     p.add_argument("--puerto", type=int, default=50052)
+    p.add_argument("--vram-gb", type=float, default=0, help="memoria que presta (para el reparto del maestro)")
     return p.parse_args(lista)
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     a = argumentos()
-    asyncio.run(Tubo(a.rele, a.clave, a.nombre, a.puerto).vivir())
+    asyncio.run(Tubo(a.rele, a.clave, a.nombre, a.puerto, info={"vram_gb": a.vram_gb} if a.vram_gb else None).vivir())
