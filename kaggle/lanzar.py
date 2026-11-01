@@ -105,12 +105,14 @@ def entorno_red() -> dict[str, str]:
 
 
 def codigo_empaquetado() -> str:
+    """Todo el código Python de fabric/ salvo pruebas, web y cuadernos (así no se olvida un módulo)."""
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz") as tar:
-        for ruta in ["fabric/__init__.py", "fabric/cliente.py", "fabric/descubrir.py", "fabric/nodo/__init__.py",
-                     "fabric/nodo/nodo.py", "fabric/nodo/motores.py", "fabric/rele/__init__.py", "fabric/rele/rele.py",
-                     "fabric/tubo.py", "fabric/rpc_cache.py"]:
-            tar.add(RAIZ / ruta, arcname=ruta)
+        for ruta in sorted((RAIZ / "fabric").rglob("*.py")):
+            rel = ruta.relative_to(RAIZ)
+            if rel.parts[1] in ("pruebas", "web", "kaggle") or "__pycache__" in rel.parts:
+                continue
+            tar.add(ruta, arcname=str(rel))
     return base64.b64encode(buf.getvalue()).decode()
 
 
