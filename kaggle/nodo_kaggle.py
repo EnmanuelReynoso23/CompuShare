@@ -4,6 +4,10 @@
 # 1. Baja llama.cpp ya compilado con CUDA (si no corre en esta GPU, lo compila).
 # 2. Baja el modelo GGUF de Hugging Face (en paralelo con el paso 1).
 # 3. Levanta llama-server y entra a la red como nodo hasta que se acabe DURACION.
+#
+# Roles (CONFIG["rol"]): "nodo" (modelo entero aquí), "maestro" (aloja el relé y reparte las capas
+# entre sus GPU y las del trabajador, vía llama.cpp RPC por el tubo del relé) y "trabajador" (presta
+# sus GPU con ggml-rpc-server, que solo escucha en su 127.0.0.1, y las ofrece por el relé).
 # Todo lo que pasa queda en el log del cuaderno y en /kaggle/working/resumen.json.
 
 import base64
@@ -150,12 +154,14 @@ def preparar_llama():
         f"cmake -S {fuente} -B {fuente}/build -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES={capacidad} -DLLAMA_CURL=OFF -DCMAKE_BUILD_TYPE=Release",
         f"cmake --build {fuente}/build --target llama-server -j{os.cpu_count()}",
     ]
+    pasos[1] += " -DGGML_RPC=ON"
     for paso in pasos:
         r = sh(paso)
         if r.returncode != 0:
             estado["error_llama"] = (r.stdout + r.stderr)[-2000:]
             log("falló:", paso, estado["error_llama"])
             return
+    sh(f"cmake --build {fuente}/build --target ggml-rpc-server -j{os.cpu_count()}")  # solo lo usa el trabajador
     estado["llama"] = (f"{fuente}/build/bin/llama-server", dict(os.environ))
     estado["llama_origen"] = "compilado"
     etapa("llama_cpp", t0)
@@ -187,9 +193,111 @@ if "llama" not in estado or "modelo" not in estado:
     guardar_resumen()
     raise SystemExit("No hay llama.cpp o modelo; ver el log.")
 
+ROL = CONFIG.get("rol", "nodo")
+binario, entorno = estado["llama"]
+
+
+def salud_local():
+    with urllib.request.urlopen("http://127.0.0.1:8095/salud", timeout=5) as rr:
+        return json.load(rr)
+
+
+# ── 4t. trabajador: presta sus GPU por el tubo y no hace nada más ──────────
+def trabajador():
+    import asyncio
+    import logging
+    import socket
+
+    from fabric import rpc_cache
+    from fabric.tubo import Tubo
+
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    t0 = time.time()
+    candidatos = sh(f"find {TRABAJO} -type f \\( -name ggml-rpc-server -o -name rpc-server \\)").stdout.split()
+    if not candidatos:
+        resumen["error"] = "no hay ggml-rpc-server en esta compilación de llama.cpp"
+        guardar_resumen()
+        raise SystemExit(resumen["error"])
+    rpc_bin = candidatos[0]
+    os.chmod(rpc_bin, 0o755)
+    # La caché de ggml-rpc-server se arma desde el GGUF que bajamos: los pesos no cruzan el túnel.
+    cache = f"{TRABAJO}/llcache"
+    try:
+        lleno = rpc_cache.llenar(estado["modelo"], f"{cache}/rpc")
+        resumen["cache_rpc"] = {"tensores": lleno["tensores"], "gb": round(lleno["bytes"] / 1e9, 2)}
+    except Exception as e:
+        resumen["cache_rpc"] = {"error": repr(e)[:300]}
+    log("caché RPC:", resumen["cache_rpc"])
+    etapa("cache_rpc", t0)
+    dispositivos = ",".join(f"CUDA{i}" for i in range(len(gpus))) or "CPU"
+    rpc_log = open(f"{SALIDA}/rpc-server.log", "w")
+    proceso = subprocess.Popen(
+        [rpc_bin, "-d", dispositivos, "-H", "127.0.0.1", "-p", "50052", "-c"], stdout=rpc_log,
+        stderr=subprocess.STDOUT, env=dict(entorno, LLAMA_CACHE=cache), cwd=os.path.dirname(rpc_bin),
+    )
+    for _ in range(120):
+        try:
+            socket.create_connection(("127.0.0.1", 50052), timeout=1).close()
+            break
+        except OSError:
+            if proceso.poll() is not None:
+                break
+            time.sleep(1)
+    if proceso.poll() is not None:
+        rpc_log.flush()
+        resumen["error"] = "ggml-rpc-server no arrancó: " + open(f"{SALIDA}/rpc-server.log").read()[-2000:]
+        guardar_resumen()
+        raise SystemExit(resumen["error"])
+    log(f"ggml-rpc-server en 127.0.0.1:50052 con {dispositivos}")
+
+    async def vivir():
+        tubo = Tubo("buscar", CONFIG["clave"], CONFIG["tubo"], 50052)
+        tarea = asyncio.create_task(tubo.vivir())
+        fin = time.time() + CONFIG["duracion_min"] * 60
+        while time.time() < fin and proceso.poll() is None:
+            await asyncio.sleep(60)
+            log(f"tubo {CONFIG['tubo']}: {tubo.bytes / 1e6:.1f} MB, {tubo.conexiones} conexiones")
+        tarea.cancel()
+        return tubo
+
+    t0 = time.time()
+    tubo = asyncio.run(vivir())
+    resumen["tubo_mb"] = round(tubo.bytes / 1e6, 1)
+    resumen["tubo_conexiones"] = tubo.conexiones
+    resumen["rpc_server_vivo"] = proceso.poll() is None
+    etapa("prestando_gpu", t0)
+    proceso.terminate()
+    rpc_log.close()
+    guardar_resumen()
+
+
+if ROL == "trabajador":
+    trabajador()
+    log("fin")
+    sys.exit(0)
+
+# ── 4m. maestro: espera al trabajador ───────────────────────────────────────
+puerto_tubo = None
+if ROL == "maestro":
+    t = time.time()
+    limite = time.time() + CONFIG.get("espera_trabajador_min", 45) * 60
+    while time.time() < limite and not puerto_tubo:
+        try:
+            puerto_tubo = (salud_local().get("tubos", {}).get(CONFIG["tubo"]) or {}).get("puerto")
+        except Exception:
+            pass
+        if not puerto_tubo:
+            time.sleep(5)
+    if not puerto_tubo:
+        resumen["error"] = f"el trabajador {CONFIG['tubo']} no apareció"
+        guardar_resumen()
+        raise SystemExit(resumen["error"])
+    log(f"trabajador {CONFIG['tubo']} conectado: su ggml-rpc-server está en 127.0.0.1:{puerto_tubo}")
+    etapa("esperar_trabajador", t)
+    tubo_antes = salud_local()["tubo_bytes"]
+
 # ── 4. llama-server ─────────────────────────────────────────────────────────
 t = time.time()
-binario, entorno = estado["llama"]
 comando = [
     binario,
     "-m", estado["modelo"],
@@ -201,11 +309,13 @@ comando = [
     "--parallel", str(CONFIG["paralelo"]),
     "--jinja",
 ]
+if puerto_tubo:
+    comando += ["--rpc", f"127.0.0.1:{puerto_tubo}"]
 log("arrancando:", " ".join(comando[1:]))
 registro = open(f"{SALIDA}/llama-server.log", "w")
 servidor = subprocess.Popen(comando, stdout=registro, stderr=subprocess.STDOUT, env=entorno, cwd=os.path.dirname(binario))
 listo = False
-for _ in range(900):
+for _ in range(3600 if puerto_tubo else 900):
     if servidor.poll() is not None:
         break
     try:
@@ -225,10 +335,22 @@ etapa("llama_server", t)
 log("VRAM en uso:", sh("nvidia-smi --query-gpu=memory.used,memory.total --format=csv,noheader").stdout.strip())
 
 # ── 4b. diagnóstico: capas en GPU y velocidad medida aquí mismo, sin red ───
+import re  # noqa: E402
+
 diagnostico = {"llama": str(estado.get("llama_origen"))}
+reparto = []
 for linea in open(f"{SALIDA}/llama-server.log", errors="replace"):
     if "offloaded" in linea:
         diagnostico["capas_gpu"] = linea.strip().split("offloaded", 1)[1].strip()[:60]
+    m = re.search(r"(\S+) model buffer size =\s*([\d.]+) MiB", linea)
+    if m:
+        reparto.append(f"{m.group(1)}={float(m.group(2)) / 1024:.1f}GB")
+if reparto:
+    diagnostico["reparto"] = " ".join(reparto)
+if puerto_tubo:
+    diagnostico["equipos"] = 2
+    diagnostico["tubo_carga_mb"] = round((salud_local()["tubo_bytes"] - tubo_antes) / 1e6, 1)
+    tubo_antes = salud_local()["tubo_bytes"]
 try:
     pedido = urllib.request.Request(
         "http://127.0.0.1:8080/completion",
@@ -239,6 +361,9 @@ try:
         tiempos = json.load(rr).get("timings", {})
     diagnostico["local_tok_s"] = round(tiempos.get("predicted_per_second", 0), 1)
     diagnostico["local_prompt_tok_s"] = round(tiempos.get("prompt_per_second", 0), 1)
+    if puerto_tubo and tiempos.get("predicted_n"):
+        n = tiempos["predicted_n"] + tiempos.get("prompt_n", 0)
+        diagnostico["tubo_kb_por_token"] = round((salud_local()["tubo_bytes"] - tubo_antes) / 1e3 / n, 1)
 except Exception as e:
     diagnostico["local_error"] = repr(e)[:100]
 resumen["diagnostico"] = diagnostico

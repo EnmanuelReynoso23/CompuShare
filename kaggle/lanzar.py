@@ -1,7 +1,8 @@
 """Sube a Kaggle los cuadernos-nodo (GPU T4 x2) y los pone a correr.
 
-    python fabric/kaggle/lanzar.py               # los dos nodos
+    python fabric/kaggle/lanzar.py               # los dos nodos (cada uno con su modelo entero)
     python fabric/kaggle/lanzar.py calidad       # solo uno
+    python fabric/kaggle/lanzar.py --dividido    # UN modelo repartido entre dos cuadernos (llama.cpp RPC)
     python fabric/kaggle/lanzar.py --estado      # cómo van
     python fabric/kaggle/lanzar.py --bajar DIR   # traer logs y resumen.json
 
@@ -55,7 +56,39 @@ NODOS = {
         "contexto": 16384,
         "paralelo": 2,
     },
+    # Un solo modelo en dos computadoras: el maestro aloja el relé y llama-server; el trabajador
+    # presta sus 2 GPU con ggml-rpc-server por el tubo del relé. Las capas se reparten según la
+    # memoria libre de las 4 GPU (mitad y mitad). Modelo chico a propósito: la parte que no está en
+    # la caché del trabajador cruza el túnel de Cloudflare.
+    "maestro": {
+        "rol": "maestro",
+        "nombre": "kaggle-qwen3.5-9b-2-equipos",
+        "rele": "aqui",
+        "tubo": "trabajador-1",
+        "espera_trabajador_min": 45,
+        "modelo_repo": "unsloth/Qwen3.5-9B-GGUF",
+        "modelo_archivo": "Qwen3.5-9B-Q8_0.gguf",
+        "modelo_nombre": "Qwen3.5-9B (2 equipos)",
+        "embeber": "",
+        "reordenar": "",
+        "contexto": 16384,
+        "paralelo": 1,
+    },
+    "trabajador": {
+        "rol": "trabajador",
+        "nombre": "kaggle-trabajador-1",
+        "rele": "buscar",
+        "tubo": "trabajador-1",
+        "modelo_repo": "unsloth/Qwen3.5-9B-GGUF",
+        "modelo_archivo": "Qwen3.5-9B-Q8_0.gguf",
+        "modelo_nombre": "",
+        "embeber": "",
+        "reordenar": "",
+        "contexto": 0,
+        "paralelo": 0,
+    },
 }
+GRUPOS = {"normal": ["calidad", "rapido"], "dividido": ["maestro", "trabajador"]}
 
 
 def entorno_red() -> dict[str, str]:
@@ -71,7 +104,8 @@ def codigo_empaquetado() -> str:
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz") as tar:
         for ruta in ["fabric/__init__.py", "fabric/cliente.py", "fabric/descubrir.py", "fabric/nodo/__init__.py",
-                     "fabric/nodo/nodo.py", "fabric/nodo/motores.py", "fabric/rele/__init__.py", "fabric/rele/rele.py"]:
+                     "fabric/nodo/nodo.py", "fabric/nodo/motores.py", "fabric/rele/__init__.py", "fabric/rele/rele.py",
+                     "fabric/tubo.py", "fabric/rpc_cache.py"]:
             tar.add(RAIZ / ruta, arcname=ruta)
     return base64.b64encode(buf.getvalue()).decode()
 
@@ -84,6 +118,10 @@ def lanzar(clave: str, duracion_min: int, enjambre: str) -> None:
     red = entorno_red()
     if NODOS[clave]["rele"] == "aqui":
         duracion_min += 10
+    if NODOS[clave].get("rol") in ("maestro", "trabajador"):
+        duracion_min += 15  # el maestro espera al trabajador; el trabajador debe durar más que el maestro
+    if NODOS[clave].get("rol") == "trabajador":
+        duracion_min += 15
     config = dict(NODOS[clave], clave=red["FABRIC_CLAVE"], enjambre=enjambre,
                   duracion_min=duracion_min, llama_cpp=LLAMA_CPP, cloudflared=CLOUDFLARED)
     script = (AQUI / "nodo_kaggle.py").read_text()
@@ -132,7 +170,7 @@ if __name__ == "__main__":
     elif args[:1] == ["--bajar"]:
         bajar(args[1] if len(args) > 1 else "resultados")
     else:
-        cuales = [a for a in args if a in NODOS] or list(NODOS)
+        cuales = [a for a in args if a in NODOS] or GRUPOS["dividido" if "--dividido" in args else "normal"]
         duracion = int(os.environ.get("DURACION_MIN", "50"))
         for clave in cuales:
             lanzar(clave, duracion, os.environ.get("FABRIC_ENJAMBRE", "publico"))

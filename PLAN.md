@@ -6,7 +6,7 @@
 | --- | --- |
 | Repartir preguntas entre equipos (cada uno con su modelo completo) | FUNCIONA (probado con el relé en Oracle; 31-oct se sacó de Oracle). 2 cuadernos Kaggle (Qwen3.8-27B y Qwen3.6-35B-A3B) respondiendo de verdad. |
 | Dónde vive cada cosa | Web en Vercel. Relé dentro del cuaderno Kaggle `calidad`, con túnel rápido de Cloudflare; su dirección se publica en ntfy.sh bajo un tema que sale de la clave. NADA en Oracle (decisión del usuario, 31-oct). |
-| Dividir UN modelo entre 2 computadoras | NO EXISTE TODAVÍA. El "ring pipeline" de p2p-neural-fabric era simulado (tensores de `Math.sin`) y se borró. |
+| Dividir UN modelo entre 2 computadoras | FUNCIONA (31-oct): Qwen3.5-9B Q8_0 repartido entre 2 cuadernos Kaggle por el tubo del relé, 6,8 tok/s, 42 MB por el túnel al cargar. Lectura del prompt lenta (por revisar). Ver `kaggle/resultados/20261031-dividido/INFORME.md`. |
 | Búsqueda con embeddings en Kaggle | Falló por memoria en la GPU 0 (comparte con llama.cpp). Arreglado en el código; falta repetirla. |
 | Velocidad en Kaggle | Sospechosa: 27B a 5,1 tok/s con primer token a 115 s; 35B-A3B a 9 tok/s con primer token a 69 s. En 2 x T4 se esperaría bastante más. Hay que leer `llama-server.log` antes de seguir. |
 | Navegadores | Pueden donar un modelo pequeño completo (WebLLM). No pueden aportar "media IA": WebLLM no reparte capas. |

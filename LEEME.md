@@ -23,6 +23,8 @@ una PC propia o un navegador con WebGPU. Sustituye a `p2p-neural-fabric` (Appwri
 | `rele/rele.py` | Relé WebSocket (Python, `websockets`). Memoria pura: nodos, tareas en curso y la sala del chat (últimos 50 mensajes). Clave compartida, límite de ritmo por conexión, `GET /salud`. |
 | `rele/Dockerfile`, `docker-compose.yml` | Por si algún día corre en un servidor propio (hoy no se usa). |
 | `descubrir.py` | Publica y busca la dirección del relé (ntfy.sh). |
+| `tubo.py` | Tubo TCP por el relé (lado trabajador): ofrece un puerto de su 127.0.0.1 (un `ggml-rpc-server`) y el relé lo abre en el 127.0.0.1 del maestro. Sin compresión (con ella la carga iba 13 veces más lenta). |
+| `rpc_cache.py` | Arma la caché de `ggml-rpc-server -c` desde el GGUF del trabajador (FNV-1a de cada tensor > 10 MiB, verificado contra llama.cpp b12024): los pesos grandes no cruzan el túnel. |
 | `nodo/nodo.py` | Nodo: entra al relé con sus capacidades, late cada 10 s, atiende tareas con un semáforo por capacidad y se reconecta solo. |
 | `nodo/motores.py` | `eco`, `generar` (cualquier servidor OpenAI con streaming: llama.cpp, vLLM, Ollama), `embeber` y `reordenar` (sentence-transformers). |
 | `cliente.py` | Cliente Python (`ClienteRed`, `pedir_sync`). |
@@ -66,6 +68,7 @@ Un `id` pedido se respeta si nadie más lo tiene abierto (así el navegador cons
 ```bash
 python fabric/kaggle/lanzar.py              # sube y arranca los dos nodos (GPU T4 x2, privados)
 python fabric/kaggle/lanzar.py --estado
+DURACION_MIN=30 python fabric/kaggle/lanzar.py --dividido   # UN modelo en dos cuadernos (maestro + trabajador)
 DURACION_MIN=55 python fabric/kaggle/lanzar.py rapido
 python fabric/kaggle/lanzar.py --bajar /tmp/salida   # resumen.json y llama-server.log
 . ~/.config/synrag/fabric.env && .venv-fabric/bin/python -m fabric.pruebas.delegar
@@ -80,6 +83,25 @@ El cuaderno baja llama.cpp ya compilado con CUDA 12.8 (release fijada en `lanzar
 `--list-devices` no ve CUDA, compila para la GPU que encuentre. Qwen3.8-Flash-Next (~100 GB) no cabe
 en 2 x T4. La clave del relé va dentro del código del cuaderno privado: rotarla después de probar
 (`fabric.env` local; se cambió el 31-oct).
+
+## Una IA en dos computadoras (`--dividido`)
+
+```
+ cuaderno maestro (2 x T4)                         cuaderno trabajador (2 x T4)
+ llama-server --rpc 127.0.0.1:50100                ggml-rpc-server -d CUDA0,CUDA1 -H 127.0.0.1 -c
+        |  (TCP local)                                    ^  (TCP local)
+        v                                                 |
+ relé :8095  <==== wss:// túnel de Cloudflare ====  python -m fabric.tubo --nombre trabajador-1
+```
+
+- El servidor RPC de llama.cpp no tiene clave ni cifrado: solo escucha en el 127.0.0.1 del trabajador
+  y viaja dentro del WebSocket del relé (con la clave). El puerto del maestro también es local.
+- Las capas se reparten según la memoria libre de las 4 GPU. Por cada token cruzan solo los estados
+  intermedios; los pesos grandes salen de la caché que el trabajador arma desde su propio GGUF.
+- El maestro entra a la red como un nodo `generar` más, con `info.equipos=2`, `reparto`
+  (GB por equipo), `tubo_carga_mb` y `tubo_kb_por_token`.
+- Prueba local (CPU, Qwen3.5-0.8B, 31-oct): respuesta correcta por el tubo; carga 7,4 s con caché y
+  sin compresión (96,6 s con compresión), 4,1 tok/s (RPC directo sin tubo: 7,1).
 
 ## SynRAG por la red
 

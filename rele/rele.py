@@ -65,6 +65,8 @@ TEXTO_MAX = 8000
 TIPOS_DE_TAREA = {"eco", "generar", "embeber", "reordenar"}
 ENJAMBRE_VALIDO = re.compile(r"^[a-z0-9-]{1,40}$")
 ID_VALIDO = re.compile(r"^[A-Za-z0-9_-]{4,48}$")
+TUBO_PUERTO_BASE = int(os.environ.get("TUBO_PUERTO_BASE", "50100"))
+TUBO_TROZO = 256 * 1024
 
 log = logging.getLogger("rele")
 
@@ -105,6 +107,16 @@ class Par:
 
 
 @dataclass
+class Oferta:
+    nombre: str
+    control: Any
+    puerto: int
+    servidor: Any = None
+    abiertos: int = 0
+    esperando: dict[str, asyncio.Future] = field(default_factory=dict)
+
+
+@dataclass
 class Tarea:
     id: str
     id_cliente: str
@@ -123,6 +135,8 @@ class Rele:
         self.salas: dict[str, deque[dict[str, Any]]] = {}
         self.inicio = time.time()
         self.tareas_atendidas = 0
+        self.ofertas: dict[str, Oferta] = {}
+        self.tubo_bytes = 0
 
     # ── utilidades ──────────────────────────────────────────────────────────
 
@@ -175,6 +189,8 @@ class Rele:
             "tareas_en_curso": len(self.tareas),
             "tareas_atendidas": self.tareas_atendidas,
             "enjambres": enjambres,
+            "tubos": {o.nombre: {"puerto": o.puerto, "abiertos": o.abiertos} for o in self.ofertas.values()},
+            "tubo_bytes": self.tubo_bytes,
         }
 
     # ── conexión ────────────────────────────────────────────────────────────
@@ -187,6 +203,9 @@ class Rele:
             primero = json.loads(await asyncio.wait_for(ws.recv(), timeout=10))
         except (asyncio.TimeoutError, ConnectionClosed, ValueError, TypeError):
             await ws.close(1008, "falta hola")
+            return
+        if ws.request is not None and ws.request.path.split("?")[0] == "/tubo":
+            await self.atender_tubo(ws, primero)
             return
         par = await self.presentar(ws, primero)
         if par is None:
@@ -376,6 +395,100 @@ class Rele:
         await self.difundir(par.enjambre, {"t": "mensaje", "mensaje": mensaje})
 
     # ── limpieza ────────────────────────────────────────────────────────────
+
+    # ── tubos TCP ───────────────────────────────────────────────────────────
+    # Para dividir un modelo entre dos cuadernos con llama.cpp RPC: el trabajador "ofrece" su
+    # ggml-rpc-server (que solo escucha en su 127.0.0.1) y el relé abre un puerto en el 127.0.0.1 de
+    # esta máquina; cada conexión TCP que llega ahí viaja por un WebSocket propio hasta el trabajador.
+    # Nada queda abierto a internet: solo entra quien tiene la clave, y el puerto es local.
+
+    async def atender_tubo(self, ws: ServerConnection, m: Any) -> None:
+        if not isinstance(m, dict) or not hmac.compare_digest(str(m.get("clave", "")).encode(), self.clave.encode()):
+            await ws.close(1008, "clave incorrecta")
+            return
+        if m.get("t") == "ofrezco":
+            await self.ofrecer(ws, str(m.get("nombre") or ""))
+        elif m.get("t") == "datos":
+            esperando = next((o.esperando.pop(str(m.get("id")), None) for o in self.ofertas.values()
+                              if str(m.get("id")) in o.esperando), None)
+            if esperando is None or esperando.done():
+                await ws.close(1008, "tubo desconocido")
+                return
+            terminado = asyncio.Event()
+            esperando.set_result((ws, terminado))
+            await terminado.wait()
+        else:
+            await ws.close(1008, "tubo inválido")
+
+    async def ofrecer(self, ws: ServerConnection, nombre: str) -> None:
+        if not ENJAMBRE_VALIDO.match(nombre):
+            await ws.close(1008, "nombre inválido")
+            return
+        vieja = self.ofertas.pop(nombre, None)
+        if vieja:
+            vieja.servidor.close()
+        usados = {o.puerto for o in self.ofertas.values()}
+        puerto = next(p for p in range(TUBO_PUERTO_BASE, TUBO_PUERTO_BASE + 100) if p not in usados)
+        oferta = Oferta(nombre=nombre, control=ws, puerto=puerto)
+        oferta.servidor = await asyncio.start_server(
+            lambda lector, escritor: self.abrir_tubo(oferta, lector, escritor), "127.0.0.1", puerto
+        )
+        self.ofertas[nombre] = oferta
+        log.info("tubo %s ofrecido en 127.0.0.1:%s", nombre, puerto)
+        try:
+            await ws.send(json.dumps({"t": "listo", "puerto": puerto}))
+            async for _ in ws:  # solo latidos; la conexión de control vive mientras se ofrezca
+                pass
+        except ConnectionClosed:
+            pass
+        finally:
+            oferta.servidor.close()
+            for futuro in oferta.esperando.values():
+                futuro.cancel()
+            if self.ofertas.get(nombre) is oferta:
+                del self.ofertas[nombre]
+            log.info("tubo %s retirado", nombre)
+
+    async def abrir_tubo(self, oferta: Oferta, lector: asyncio.StreamReader, escritor: asyncio.StreamWriter) -> None:
+        ident = secrets.token_hex(8)
+        futuro: asyncio.Future = asyncio.get_running_loop().create_future()
+        oferta.esperando[ident] = futuro
+        try:
+            await oferta.control.send(json.dumps({"t": "abre", "id": ident}))
+            ws, terminado = await asyncio.wait_for(futuro, timeout=30)
+        except (asyncio.TimeoutError, asyncio.CancelledError, ConnectionClosed):
+            oferta.esperando.pop(ident, None)
+            escritor.close()
+            return
+        oferta.abiertos += 1
+        try:
+            await self.canalizar(ws, lector, escritor)
+        finally:
+            oferta.abiertos -= 1
+            terminado.set()
+
+    async def canalizar(self, ws: Any, lector: asyncio.StreamReader, escritor: asyncio.StreamWriter) -> None:
+        async def hacia_ws() -> None:
+            while trozo := await lector.read(TUBO_TROZO):
+                self.tubo_bytes += len(trozo)
+                await ws.send(trozo)
+
+        async def hacia_tcp() -> None:
+            async for trozo in ws:
+                if isinstance(trozo, bytes):
+                    self.tubo_bytes += len(trozo)
+                    escritor.write(trozo)
+                    await escritor.drain()
+
+        tareas = [asyncio.create_task(hacia_ws()), asyncio.create_task(hacia_tcp())]
+        try:
+            await asyncio.wait(tareas, return_when=asyncio.FIRST_COMPLETED)
+        finally:
+            for t in tareas:
+                t.cancel()
+            await asyncio.gather(*tareas, return_exceptions=True)
+            escritor.close()
+            await ws.close()
 
     async def barrer(self) -> None:
         while True:
