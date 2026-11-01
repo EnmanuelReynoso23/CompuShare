@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #0b0a08;
+  --color-ink-soft: #141310;
+  --color-ink-panel: #17160f;
+  --color-paper: #f2efe6;
+  --color-paper-dim: #a9a599;
+  --color-paper-faint: #6b675d;
+  --color-line: #2c2a23;
+  --color-line-strong: #4a473c;
+  --font-display: "Space Mono", ui-monospace, monospace;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-ink text-paper font-mono overflow-hidden;
+  }
+
+  ::selection {
+    background: var(--color-paper);
+    color: var(--color-ink);
+  }
+}
+
+/* Faint graph-paper grid — reads as a diagram/instrument surface rather
+   than a flat dark panel. */
+.grid-surface {
+  background-image:
+    linear-gradient(to right, var(--color-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--color-line) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.hairline {
+  border-color: var(--color-line);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
