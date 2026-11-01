@@ -42,8 +42,26 @@ del estado recurrente copiándolo capa por capa desde el trabajador. Arreglado e
 - Reparto entre N trabajadores (`fabric/reparto.py`): mide la latencia de cada uno con el saludo
   HELLO del protocolo RPC y usa los menos posibles, de menor latencia.
 
+## Segunda corrida con los arreglos (10:40-10:50 p. m.)
+
+Con MTP (`--spec-type draft-mtp`) y sin puntos de control (`-ctxcp 0 --cache-ram 0`), mismo modelo y
+mismos 2 cuadernos:
+
+| Qué | Primera corrida | Segunda corrida |
+| --- | --- | --- |
+| Misma pregunta por la red, en caliente | 28,7 s | 10,7 s |
+| Misma pregunta, primera vez | 50,5 s | 11,4 s |
+| Generación | 6,8-6,9 tok/s | 10,3-10,8 tok/s |
+| Ida y vuelta por el tubo (HELLO RPC, nueva medición) | - | 237 ms |
+| Por el túnel al cargar | 42,4 MB | 42,3 MB |
+
+El diagnóstico interno del maestro (primera petición, en frío) dio 3,6 tok/s y 0,2 tok/s de prompt:
+la primera petición después de cargar sigue lenta (calentamiento); las siguientes, no.
+
 ## Pendiente
 
 - El log de llama-server (verbosidad 3) no trae el reparto por equipo: falta otra forma de leerlo.
 - Comparar con el mismo modelo en un solo cuaderno (costo del reparto).
+- La primera petición tras cargar sigue lenta; el diagnóstico no registró los aciertos de MTP.
+- 237 ms de ida y vuelta por Cloudflare: probar conexión directa entre cuadernos (más rápida).
 - El relé en Python cuesta: en local el tubo baja de 7,1 a 4,1 tok/s frente al RPC directo.
