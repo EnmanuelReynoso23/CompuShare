@@ -332,7 +332,10 @@ comando = [
     "--jinja",
 ]
 if rpc:
-    comando += ["--rpc", ",".join(rpc)]
+    # Sin puntos de control ni caché de prompts: en modelos híbridos (Qwen3.5) copian el estado capa por
+    # capa con GET_TENSOR, cada uno espera una ida y vuelta por internet. Medido en local con 60 ms de
+    # latencia: de 37-85 esperas por pregunta a 1, y la lectura del prompt de 3,3 a 15,6 tok/s.
+    comando += ["--rpc", ",".join(rpc), "-ctxcp", "0", "--cache-ram", "0"]
 if CONFIG.get("especulativo"):
     comando += ["--spec-type", CONFIG["especulativo"]]
 log("arrancando:", " ".join(comando[1:]))
