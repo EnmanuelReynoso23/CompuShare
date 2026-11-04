@@ -132,6 +132,20 @@ def lanzar(clave: str, duracion_min: int, enjambre: str) -> None:
     nodo = dict(NODOS[clave])
     if os.environ.get("SIN_MTP") and nodo.get("especulativo"):
         nodo["especulativo"] = ""  # para comparar contra el mismo modelo sin adivinar
+    if os.environ.get("TRANSCRIBIR") and nodo.get("rol") == "maestro":
+        # El maestro copia el libro trozo a trozo y deja transcripcion.json; no entra a la red después.
+        # n-gramas: adivina copiando del propio texto de entrada (lo natural para transcribir).
+        sys.path.insert(0, str(RAIZ / "src"))
+        from compushare.transcribir import trozos_de_archivo
+
+        libro = os.environ.get("LIBRO", str(RAIZ / "data/la_metamorfosis_kafka.txt"))
+        nodo["trozos"] = trozos_de_archivo(libro, int(os.environ.get("TROZO_CHARS", "1500")))
+        # 1 flujo por defecto: en local (llama.cpp 11193, 4-nov-2026) 4 flujos + ngram-mod dieron menos
+        # tok/s totales (2,77 frente a 4,89) y rompieron letras con tilde en 2 de 4 trozos.
+        nodo["paralelo"] = max(1, int(os.environ.get("FLUJOS", "1")))
+        nodo["especulativo"] = os.environ.get("ESPECULATIVO", "ngram-mod,draft-mtp")
+        nodo["especulativo_alternativas"] = ["ngram-mod", "draft-mtp", ""]
+        nodo["solo_transcribir"] = True
     config = dict(nodo, clave=red["FABRIC_CLAVE"], enjambre=enjambre,
                   duracion_min=duracion_min, llama_cpp=LLAMA_CPP, cloudflared=CLOUDFLARED)
     script = (AQUI / "nodo_kaggle.py").read_text()

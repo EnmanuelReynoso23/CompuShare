@@ -26,7 +26,8 @@ class Eco:
 
 
 class Generar:
-    """Texto con un servidor compatible con OpenAI (llama-server de llama.cpp, vLLM...)."""
+    """Texto con llama-server (llama.cpp), por su protocolo propio:
+    `/apply-template` arma el prompt con la plantilla del modelo y `/completion` lo genera en streaming."""
 
     tipo = "generar"
 
@@ -46,42 +47,40 @@ class Generar:
             mensajes = [{"role": "user", "content": str(datos["prompt"])}]
         if not isinstance(mensajes, list) or not mensajes:
             raise ValueError("generar necesita `mensajes` o `prompt`")
-        cuerpo = {
-            "model": self.modelo or "local",
-            "messages": mensajes,
-            "max_tokens": min(int(datos.get("max_tokens") or self.max_tokens), 8192),
-            "temperature": float(datos.get("temperatura", 0.3)),
-            "stream": True,
-            "stream_options": {"include_usage": True},
-        }
+        plantilla: dict[str, Any] = {"messages": mensajes}
         # Los Qwen recientes razonan antes de contestar; `pensar: false` lo apaga
         # (respuestas más cortas y rápidas para tareas mecánicas).
         if datos.get("pensar") is False:
-            cuerpo["chat_template_kwargs"] = {"enable_thinking": False}
+            plantilla["chat_template_kwargs"] = {"enable_thinking": False}
         inicio = time.monotonic()
+        r = await self.http.post(f"{self.url}/apply-template", json=plantilla)
+        r.raise_for_status()
+        cuerpo = {
+            "prompt": r.json()["prompt"],
+            "n_predict": min(int(datos.get("max_tokens") or self.max_tokens), 8192),
+            "temperature": float(datos.get("temperatura", 0.3)),
+            "stream": True,
+        }
         primero: float | None = None
         partes: list[str] = []
         pendiente = ""
         ultimo_envio = time.monotonic()
         uso: dict[str, Any] = {}
-        async with self.http.stream("POST", f"{self.url}/v1/chat/completions", json=cuerpo) as r:
+        async with self.http.stream("POST", f"{self.url}/completion", json=cuerpo) as r:
             r.raise_for_status()
             async for linea in r.aiter_lines():
                 if not linea.startswith("data:"):
                     continue
-                carga = linea[5:].strip()
-                if carga == "[DONE]":
+                trozo = json.loads(linea[5:].strip())
+                delta = trozo.get("content") or ""
+                if delta:
+                    if primero is None:
+                        primero = time.monotonic()
+                    partes.append(delta)
+                    pendiente += delta
+                if trozo.get("stop"):
+                    uso = trozo.get("timings") or {}
                     break
-                trozo = json.loads(carga)
-                if trozo.get("usage"):
-                    uso = trozo["usage"]
-                for opcion in trozo.get("choices") or []:
-                    delta = (opcion.get("delta") or {}).get("content") or ""
-                    if delta:
-                        if primero is None:
-                            primero = time.monotonic()
-                        partes.append(delta)
-                        pendiente += delta
                 # Agrupar el avance: un mensaje cada ~0,25 s, no uno por token.
                 if pendiente and time.monotonic() - ultimo_envio > 0.25:
                     await avance(pendiente)
@@ -90,12 +89,12 @@ class Generar:
         if pendiente:
             await avance(pendiente)
         total = time.monotonic() - inicio
-        tokens = int(uso.get("completion_tokens") or 0)
+        tokens = int(uso.get("predicted_n") or 0)
         generando = total - ((primero or time.monotonic()) - inicio)
         return {
             "texto": "".join(partes),
             "modelo": self.modelo,
-            "tokens_entrada": int(uso.get("prompt_tokens") or 0),
+            "tokens_entrada": int(uso.get("prompt_n") or 0),
             "tokens_salida": tokens,
             "segundos": round(total, 2),
             "primer_token_s": round((primero or time.monotonic()) - inicio, 2),

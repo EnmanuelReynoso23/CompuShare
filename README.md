@@ -1,215 +1,118 @@
 # CompuShare: La Computadora Compartida
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/EnmanuelReynoso23/CompuShare/main/fabric/web/public/favicon.svg" width="90" alt="CompuShare Logo" />
-</p>
+Un solo modelo de lenguaje abierto, repartido por capas entre varias computadoras conectadas por internet.
+Software libre de punta a punta: llama.cpp hace el cálculo y CompuShare conecta las máquinas,
+elige cuáles usar y mide.
 
-<p align="center">
-  <strong>Red Distribuida de Cómputo e Inferencia de Inteligencia Artificial</strong><br />
-  <em>Une computadoras personales, servidores comunitarios y GPUs ociosas en una sola supercomputadora de inferencia.</em>
-</p>
+> No necesitamos centros de datos controlados por unos pocos. El poder ya está repartido en millones
+> de máquinas; juntas pueden correr lo que ninguna corre sola.
 
-<p align="center">
-  <a href="https://github.com/EnmanuelReynoso23/CompuShare/blob/main/LICENSE"><img src="https://img.shields.io/badge/Licencia-MIT-green.svg" alt="Licencia MIT" /></a>
-  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.10%2B-blue.svg?logo=python&logoColor=white" alt="Python 3.10+" /></a>
-  <a href="https://enmanuelreynoso23.github.io/CompuShare/"><img src="https://img.shields.io/badge/Sitio%20Web-Documentaci%C3%B3n-purple.svg" alt="Sitio Web" /></a>
-  <img src="https://img.shields.io/badge/Pruebas-42%20pasadas-success.svg?logo=pytest&logoColor=white" alt="42 tests pasados" />
-  <img src="https://img.shields.io/badge/API-OpenAI%20Compatible-black.svg?logo=openai&logoColor=white" alt="OpenAI Compatible" />
-  <img src="https://img.shields.io/badge/Hardware-CUDA%20%2F%20CPU-orange.svg?logo=nvidia&logoColor=white" alt="CUDA / CPU" />
-</p>
+Licencia MIT.
 
 ---
 
-> *"No necesitamos centros de datos gigantescos controlados por unos pocos. El poder ya está aquí, distribuido en millones de máquinas conectadas que, juntas, forman una sola supercomputadora."*
+## Cómo funciona
 
----
-
-## Manifiesto y Visión
-
-Hoy en día, el acceso a los modelos de inteligencia artificial más potentes está hipercentralizado. Dependemos de un puñado de corporaciones que controlan los centros de datos y cobran por cada token generado.
-
-**CompuShare** nace del análisis sobre el futuro inevitable del cómputo: **la computadora compartida**.
-
-De la misma forma que BitTorrent descentralizó el almacenamiento y Folding@home demostró que millones de computadoras personales podían superar a las mayores supercomputadoras científicas del mundo, **CompuShare** une recursos de cómputo diversos (laptops personales, GPUs ociosas, instancias de Kaggle, Google Colab y servidores comunitarios) en una **malla global de inferencia**.
-
-- **Quien tiene cómputo ocioso:** lo aporta a la red como **Nodo Trabajador** con un solo comando.
-- **Quien necesita inferencia:** consume de la red mediante una interfaz estándar compatible con **OpenAI** (`/v1/chat/completions`) desde Cursor, Antigravity, Claude Code o cualquier SDK.
-- **Modelos que no caben en una sola máquina:** se dividen por capas (*pipeline parallelism*) entre varias máquinas conectadas.
-
----
-
-## Arquitectura General
-
-```mermaid
-flowchart TD
-    subgraph Clientes["Clientes y Agentes de IA"]
-        A["Cursor / Antigravity / Claude Code"]
-        B["CLI / SDK de CompuShare"]
-    end
-
-    subgraph ReleMaestro["Orquestador y Balanceador"]
-        R["Relé Maestro (HTTP y WebSocket Router)"]
-        Q["Cola de Tareas y Selección por Latencia"]
-    end
-
-    subgraph Enjambre["Malla de Nodos Trabajadores (Swarm)"]
-        W1["Kaggle 2x T4 (Qwen3.5 / Qwen3.8 / llama.cpp)"]
-        W2["Google Colab GPU / Servidor Local"]
-        W3["PC Gamer / GPU Ociosa Doméstica"]
-    end
-
-    A -->|OpenAI API /v1/chat/completions| R
-    B -->|OpenAI API /v1/chat/completions| R
-    R <--> Q
-    Q <-->|WebSocket Saliente / Túnel Seguro| W1
-    Q <-->|WebSocket Saliente / Túnel Seguro| W2
-    Q <-->|WebSocket Saliente / Túnel Seguro| W3
+```
+ Tu PC (maestro)                             Laptop de un amigo (trabajador)
+ llama-server --rpc ...  ── tubo ──> RELÉ <── tubo ──  ggml-rpc-server (presta su GPU o CPU)
+   primeras capas + salida                              el resto de las capas
+   escucha en 127.0.0.1
 ```
 
-### Componentes Clave:
-1. **Relé Maestro (`compushare-relay`):** Punto de encuentro ligero que expone la API compatible con OpenAI y distribuye los prompts entrantes hacia los nodos disponibles según latencia, memoria libre y carga activa.
-2. **Nodos Trabajadores (`compushare-worker`):** Ejecutan modelos abiertos (como Qwen 2.5/3.5/3.8, DeepSeek, Llama) usando motores de alto rendimiento (`llama.cpp`, `vLLM` u `Ollama`).
-3. **Conexiones Salientes Seguras:** Los workers se conectan hacia el Relé mediante WebSockets directos o túneles Cloudflare, sin necesidad de abrir puertos en routers domésticos ni lidiar con cortafuegos.
-4. **Sinergia con SynRAG:** Los agentes que consumen CompuShare utilizan [SynRAG](https://github.com/EnmanuelReynoso23/synrag) como motor AST local para mandar por la red solo los fragmentos de código necesarios (-63,9 % de tokens de prompt medidos en tareas reales).
+- **Relé** (`fabric/rele/rele.py`): punto de encuentro por WebSocket. Abre *tubos*: túneles TCP dentro
+  del WebSocket, para que el maestro llegue al `ggml-rpc-server` de un trabajador sin abrir puertos en su router.
+- **Trabajador** (`compushare unirse`): arranca `ggml-rpc-server` solo en 127.0.0.1 y lo ofrece por un tubo.
+- **Maestro** (`compushare servir`): espera a los trabajadores, mide el ping de cada uno
+  (`fabric/reparto.py`), elige los menos posibles y más cercanos, y arranca `llama-server --rpc` con lo que
+  hace falta para que funcione por internet:
+  - la tabla de salida se queda en el maestro (lo que viaja por palabra baja de 993 KB a 4,1 KB);
+  - sin puntos de control ni caché de prompts (cada uno costaba una ida y vuelta por la red);
+  - decodificación especulativa opcional (`--especulativa ngram-mod` o `draft-mtp`).
+- **Cliente** (`compushare probar`, `compushare transcribir`): habla con `llama-server` por su protocolo
+  propio (`/apply-template` y `/completion`).
+
+Se reparte por **bloques de capas**, nunca cada capa entre dos equipos ni los expertos de un MoE entre
+equipos: por internet eso multiplica las esperas de red (ver `INFORME-A11.md` y `docs/MATEMATICA.md`).
 
 ---
 
-## Hoja de Ruta y Estado del Proyecto
+## Instalación
 
-- [x] **Fase 0 (Prototipo validado):** Pruebas de concepto iniciales en Kaggle con nodos maestro, trabajador, relé WebSocket y modelos Qwen vía `llama.cpp`.
-- [x] **Fase 1 (Desacoplamiento e Infraestructura Core):** Protocolo WebSocket con streaming token a token, Relé Maestro con endpoint OpenAI `/v1/chat/completions` (SSE), Nodo Trabajador y scripts de despliegue para Kaggle.
-- [ ] **Fase 2 (Protocolo de Descubrimiento):** Registro dinámico de nodos mediante tokens/identificadores sin necesidad de reconfigurar URLs a mano.
-- [ ] **Fase 3 (Tolerancia a Nodos Efímeros):** Reintento transparente de inferencia si una sesión de Kaggle/Colab expira a mitad de una respuesta.
-- [ ] **Fase 4 (CLI Universal):** `compushare join` para donar cómputo en 1 línea y `compushare serve` para levantar el endpoint local.
-
-Documentación técnica y planes detallados:
-- [PLAN.md](PLAN.md) — Plan de trabajo integral y estado de agentes.
-- [docs/MATEMATICA.md](docs/MATEMATICA.md) — Calibración de latencias, fórmulas de rendimiento y throughput medido.
-- [docs/ESTADO-Y-PENDIENTES.md](docs/ESTADO-Y-PENDIENTES.md) — Estado actual y tareas pendientes.
-
----
-
-## Guía de Inicio Rápido (CLI)
-
-### Instalación
+Hace falta llama.cpp (`llama-server` y `ggml-rpc-server` en el PATH, o pasar `--llama-bin`).
 
 ```bash
 git clone https://github.com/EnmanuelReynoso23/CompuShare.git
 cd CompuShare
-
-# Crear entorno e instalar dependencias con uv
 uv venv
-source .venv/bin/activate    # En Windows: .\.venv\Scripts\activate
-uv pip install -e .
+uv pip install -e .        # o: python -m pip install -e .
 ```
 
-### 1. Iniciar el Relé Maestro (Orquestador + API OpenAI)
+## Uso
+
+Todos los nodos comparten una clave (`--clave`, la variable `FABRIC_CLAVE` o `~/.config/synrag/fabric.env`).
 
 ```bash
-compushare servir --puerto 8000
+# 1. Maestro: levanta el relé, espera 2 trabajadores y reparte el modelo entre ellos
+compushare servir --modelo Qwen3.5-0.8B-Q8_0.gguf --min-trabajadores 2 --espera-trabajadores 90 \
+                  --especulativa ngram-mod
+
+# 2. En cada computadora que presta su equipo
+compushare unirse --rele ws://IP-DEL-MAESTRO:59095 --nombre laptop-1 --cache
+
+# 3. Preguntar
+compushare probar --prompt "En una frase: qué es una computadora compartida?"
+
+# 4. Prueba verificable: el modelo copia un libro y cada trozo se compara letra por letra
+compushare transcribir libro.txt --cuantos 3 --salida transcripcion/
 ```
 
-Esto levanta:
-- Dashboard web en tiempo real: `http://localhost:8000/`
-- Endpoint compatible con OpenAI: `http://localhost:8000/v1/chat/completions`
-- Catálogo de modelos disponibles: `http://localhost:8000/v1/models`
-- Canal WebSocket para trabajadores: `ws://localhost:8000/ws/worker`
-
-### 2. Conectar un Nodo Trabajador al Enjambre
-
-```bash
-# Modo local con backend llama.cpp o vLLM
-compushare unirse --rele ws://127.0.0.1:8000/ws/worker --modelo qwen2.5-coder --backend llama.cpp
-
-# Modo simulado para pruebas de desarrollo (sin necesidad de GPU)
-compushare unirse --rele ws://127.0.0.1:8000/ws/worker --modelo qwen2.5-coder --backend simulado
-```
-
-### 3. Probar la Inferencia Distribuida
-
-```bash
-compushare probar --url http://127.0.0.1:8000 --modelo qwen2.5-coder --prompt "Escribe un merge sort en Python"
-```
+Otros comandos: `compushare info` (equipos de esta máquina) y `compushare calcular` (predicción con las
+fórmulas de `fabric/calculo.py`; es cálculo, no medición).
 
 ---
 
-## Uso con Clientes de IA (Cursor, Antigravity, Python)
+## Lo que está medido
 
-Al ser 100 % compatible con el estándar de OpenAI, puedes configurar CompuShare en cualquier cliente:
+Toda cifra de esta sección viene de una corrida real. Las predicciones de `fabric/calculo.py` están en
+`docs/MATEMATICA.md` y se marcan como tales.
 
-```python
-from openai import OpenAI
+| Qué | Resultado | Dónde |
+| --- | --- | --- |
+| Qwen3.5-9B Q8_0 repartido en 2 cuadernos de Kaggle (4 GPU T4), por túnel de Cloudflare (237 ms ida y vuelta) | 6,8-6,9 tok/s; con MTP 10,3-10,8 tok/s | `fabric/kaggle/resultados/20261031-dividido` |
+| Tabla de salida en el maestro | 993 KB a 4,1 KB por palabra | `fabric/reparto.py` |
+| 5 trabajadores en una PC, red simulada a 50 ms de ping y 50 Mb/s, Qwen3.5-0.8B copiando un trozo de La metamorfosis | sin especulativa 1,1 tok/s; con `ngram-mod` 4,9 tok/s (91 % de aciertos); copia exacta | medición local del 4-nov-2026 |
+| Lo mismo con 4 trozos a la vez | 2,77 tok/s en total: peor que 1 trozo con esta versión de llama.cpp | medición local del 4-nov-2026 |
+| Programa completo (`servir` + 2 `unirse` + `transcribir`) en una PC, sin retraso de red, Qwen3.5-0.8B | 3 trozos, 99,93 % de parecido, 1 exacto (el modelo chico cambia comillas y alguna letra) | prueba de punta a punta del 4-nov-2026 |
 
-client = OpenAI(
-    base_url="http://localhost:8000/v1",
-    api_key="compushare-local"
-)
-
-response = client.chat.completions.create(
-    model="qwen2.5-coder",
-    messages=[{"role": "user", "content": "Escribe una función en Python para merge sort"}],
-    stream=True
-)
-
-for chunk in response:
-    if chunk.choices[0].delta.content:
-        print(chunk.choices[0].delta.content, end="", flush=True)
-```
+Pendiente: la misma transcripción en Kaggle con el modelo de 9B (`TRANSCRIBIR=1 python fabric/kaggle/lanzar.py --dividido`).
 
 ---
 
-## Despliegue en Kaggle y Google Colab
-
-Puedes donar las GPUs de Kaggle (2x NVIDIA Tesla T4) al enjambre ejecutando el script automatizado:
-
-```python
-# En una celda de Kaggle con GPU T4 x 2 e Internet habilitado:
-!git clone https://github.com/EnmanuelReynoso23/CompuShare.git
-%cd CompuShare
-!python scripts/kaggle/worker_kaggle.py "wss://tu-rele.tudominio.com/ws/worker"
-```
-
-El script se encarga de descargar `llama-server` optimizado para CUDA, el modelo GGUF cuantizado y conectarse al relé de forma desatendida. Para más detalles, consulta la [Guía de Kaggle](scripts/kaggle/README.md).
-
----
-
-## Estructura del Repositorio
+## Estructura
 
 ```text
-compushare/
-├── fabric/                   # Red funcional: relé, tubos, nodos y reparto de capas
-│   ├── kaggle/               # Lanzador y automatización para Kaggle
-│   ├── nodo/                 # Motores locales de inferencia (llama.cpp, RPC)
-│   ├── rele/                 # Relé de coordinación y ruteo
-│   ├── simulador/            # Simulador de enlaces TCP con jitter y pérdida
-│   └── web/                  # Dashboard frontend en React + Vite + Tailwind
-├── src/compushare/           # Paquete Python estándar y CLI universal
-│   ├── cli.py                # Comandos: servir, unirse, probar, info
-│   ├── nodo/                 # Nodo Maestro y Nodo Trabajador
-│   ├── rele/                 # Servidor HTTP/WebSocket y enrutador balanceador
-│   └── protocolo.py          # Protocolo de mensajes tipado en Pydantic v2
-├── scripts/kaggle/           # Scripts de arranque para workers remotos
-├── tests/                    # Suite de pruebas automatizadas
-├── docs/                     # Documentación matemática y análisis técnico
-├── pyproject.toml            # Configuración del paquete y dependencias
-├── LICENSE                   # Licencia de código abierto MIT
-└── README.md
+fabric/                 La red
+  rele/                 Relé WebSocket con tubos TCP
+  tubo.py               Lado trabajador del tubo
+  reparto.py            Elegir trabajadores; tabla de salida en el maestro
+  rpc_cache.py          Caché del trabajador armada desde su propio GGUF (los pesos no cruzan la red)
+  descubrir.py          Encontrar el relé del día sin escribir URLs
+  nodo/                 Nodo con modelo entero (generar, embeber, reordenar)
+  calculo.py            Fórmulas que predicen tok/s y memoria
+  simulador/            Proxy TCP con latencia, variación y ancho de banda; N trabajadores en una PC
+  kaggle/               lanzar.py sube los cuadernos; nodo_kaggle.py es lo que corre dentro
+  directo/              Prototipo de conexión directa P2P (WebRTC)
+  pruebas/              Pruebas (pytest)
+src/compushare/         Paquete y CLI `compushare`
+  cli.py                info, unirse, servir, calcular, probar, transcribir
+  nodo/                 Maestro y trabajador
+  transcribir.py        Copiar un texto por la red y verificarlo letra por letra
+go/                     Relé, tubo y conexión directa en Go (todavía no los usa la CLI)
+docs/                   Matemática de la red, estado del arte, estado y pendientes
 ```
 
----
+Pruebas: `python -m pytest fabric/pruebas`.
 
-## Tecnologías y Lenguajes
-
-| Lenguaje / Tecnología | Rol en CompuShare | Archivos / Líneas |
-| :--- | :--- | :---: |
-| **Python (3.10+)** | **Motor Central, Relé y CLI:** Orquestación asíncrona (`asyncio`, `aiohttp`, `websockets`), tipado estricto con `Pydantic v2`, CLI con `Typer`/`Rich`, simulador de red TCP y suite de pruebas (`pytest`). | 47 archivos (~7.700 líneas) |
-| **TypeScript & React** | **Dashboard Web y Frontend:** Interfaz visual de monitorización del enjambre (`fabric/web/`), construida con React, Vite y Tailwind CSS. | 11 archivos (~1.450 líneas) |
-| **C / C++ & CUDA** | **Motor de Inferencia de Alto Rendimiento:** Backend de ejecución basado en `llama.cpp` y `ggml-rpc-server`, con aceleración por hardware en GPUs NVIDIA (Tesla T4, P100, RTX). | Binarios y bindings |
-| **Shell / Bash & Docker** | **Despliegue y Automatización:** Scripts para provisionamiento autónomo en entornos efímeros (Kaggle / Google Colab) y contenedorización (`Dockerfile`, `docker-compose.yml`). | 3 archivos |
-| **Markdown, TOML & JSON** | **Especificaciones Matemáticas y Configuración:** Modelado formal de latencias (`MATEMATICA.md`), informes de pruebas empíricas y manifiesto de empaquetado. | ~33 archivos |
-
----
-
-## Licencia
-
-Este proyecto está bajo la licencia de código abierto **MIT** - consulta el archivo [LICENSE](LICENSE) para más detalles.
+Documentación: [PLAN.md](PLAN.md), [docs/MATEMATICA.md](docs/MATEMATICA.md),
+[docs/ESTADO-Y-PENDIENTES.md](docs/ESTADO-Y-PENDIENTES.md).

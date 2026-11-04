@@ -1,7 +1,5 @@
-"""Modulo de rele y mensajeria para CompuShare."""
+"""El relé de CompuShare es el de fabric (fabric/rele/rele.py): junta nodos, clientes y tubos."""
 
-from compushare.rele.servidor import ServidorRele
-from compushare.rele.enrutador import EnrutadorEnjambre, EstadoTrabajador
 from fabric.rele.rele import Rele, principal
 
-__all__ = ["ServidorRele", "EnrutadorEnjambre", "EstadoTrabajador", "Rele", "principal"]
+__all__ = ["Rele", "principal"]

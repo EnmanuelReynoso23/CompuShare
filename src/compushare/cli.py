@@ -1,6 +1,7 @@
 """Interfaz de linea de comandos (CLI) de CompuShare.
 Permite inspeccionar hardware local, unirse a la red como trabajador aportando computo,
-iniciar el nodo maestro para servir inferencia distribuida compatible con OpenAI,
+iniciar el nodo maestro que sirve el modelo repartido (llama-server de llama.cpp en 127.0.0.1),
+transcribir textos por la red para verificar la salida,
 y calcular estimaciones de rendimiento matematico.
 """
 
@@ -31,6 +32,7 @@ from rich.table import Table
 
 from compushare.nodo.maestro import NodoMaestro
 from compushare.nodo.trabajador import NodoTrabajador, buscar_binario
+from compushare import transcribir as transcripcion
 from fabric import calculo, escenarios
 
 app = typer.Typer(
@@ -127,6 +129,24 @@ def obtener_info_ram() -> dict[str, float]:
                     ram["disponible_gb"] = round(float(linea.split()[1]) / 1e6, 2)
     except Exception:
         pass
+    if ram["total_gb"] == 0 and sys.platform == "win32":
+        try:
+            import ctypes
+
+            class _Estado(ctypes.Structure):
+                _fields_ = [("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong),
+                            ("ullTotalPhys", ctypes.c_ulonglong), ("ullAvailPhys", ctypes.c_ulonglong),
+                            ("ullTotalPageFile", ctypes.c_ulonglong), ("ullAvailPageFile", ctypes.c_ulonglong),
+                            ("ullTotalVirtual", ctypes.c_ulonglong), ("ullAvailVirtual", ctypes.c_ulonglong),
+                            ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
+
+            estado = _Estado()
+            estado.dwLength = ctypes.sizeof(_Estado)
+            if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(estado)):
+                ram["total_gb"] = round(estado.ullTotalPhys / 1e9, 2)
+                ram["disponible_gb"] = round(estado.ullAvailPhys / 1e9, 2)
+        except Exception:
+            pass
     return ram
 
 
@@ -318,17 +338,20 @@ def servir(
     rele: str = typer.Option("ws://127.0.0.1:59095", help="URL del rele de coordinacion"),
     clave: str = typer.Option("", help="Clave secreta del rele (opcional si se define en entorno o archivo)"),
     clave_archivo: Optional[Path] = typer.Option(None, help="Ruta al archivo con la clave secreta"),
-    puerto: int = typer.Option(59000, help="Puerto para exponer la API compatible con OpenAI en 127.0.0.1"),
+    puerto: int = typer.Option(59000, help="Puerto de llama-server en 127.0.0.1"),
     puerto_rele: Optional[int] = typer.Option(None, help="Puerto para el rele local (si se inicia)"),
     iniciar_rele: bool = typer.Option(True, help="Iniciar servidor de rele local si no existe"),
     llama_bin: Optional[str] = typer.Option(None, help="Directorio con binarios de llama.cpp"),
     espera_trabajadores: float = typer.Option(3.0, help="Segundos para esperar conexion de trabajadores"),
     min_trabajadores: int = typer.Option(0, help="Minimo de trabajadores requeridos para distribuir"),
     threads: int = typer.Option(4, help="Hilos de CPU para llama-server (maximo 6)"),
-    ctx_size: int = typer.Option(4096, help="Tamano del contexto en tokens"),
+    ctx_size: int = typer.Option(4096, help="Tamano del contexto en tokens (por flujo)"),
+    paralelo: int = typer.Option(1, help="Peticiones atendidas a la vez (flujos)"),
+    especulativa: str = typer.Option("", help="Decodificacion especulativa de llama.cpp: ngram-mod, draft-mtp... (vacio = ninguna)"),
+    espera_carga: float = typer.Option(900.0, help="Segundos maximos para que llama-server cargue el modelo"),
     duracion: float = typer.Option(0.0, help="Segundos tras los cuales salir (0 para infinito)"),
 ):
-    """Inicia el nodo maestro: orquesta trabajadores y sirve API OpenAI en 127.0.0.1."""
+    """Inicia el nodo maestro: reparte el modelo entre los trabajadores y sirve llama-server en 127.0.0.1."""
     if not modelo.is_file():
         err_console.print(f"Error: El archivo de modelo no existe: {modelo}")
         raise typer.Exit(code=1)
@@ -340,14 +363,14 @@ def servir(
 
     console.print("[bold green]Iniciando Nodo Maestro CompuShare[/bold green]")
     console.print(f"Modelo: {modelo}")
-    console.print(f"Puerto API OpenAI: 127.0.0.1:{puerto}")
+    console.print(f"llama-server: http://127.0.0.1:{puerto}")
     console.print(f"Rele: {rele}")
 
     maestro = NodoMaestro(
         modelo=modelo,
         rele_url=rele,
         clave=clave_res,
-        puerto_openai=puerto,
+        puerto_api=puerto,
         puerto_rele=puerto_rele,
         iniciar_rele_local=iniciar_rele,
         llama_bin=llama_bin,
@@ -355,6 +378,9 @@ def servir(
         min_trabajadores=min_trabajadores,
         threads=threads,
         ctx_size=ctx_size,
+        paralelo=paralelo,
+        especulativa=especulativa,
+        espera_carga=espera_carga,
     )
 
     try:
@@ -410,60 +436,71 @@ def calcular(
 
 @app.command()
 def probar(
-    url: str = typer.Option("http://127.0.0.1:59000", "--url", "-u", help="URL base del servidor OpenAI"),
-    modelo: str = typer.Option("local", "--modelo", "-m", help="Nombre del modelo a invocar"),
-    prompt: str = typer.Option("Explica en dos frases que es la computacion distribuida.", "--prompt", "-p", help="Prompt para la inferencia"),
-    stream: bool = typer.Option(True, "--stream/--no-stream", help="Activar streaming token a token"),
+    url: str = typer.Option("http://127.0.0.1:59000", "--url", "-u", help="URL de llama-server (el del maestro)"),
+    prompt: str = typer.Option("Explica en dos frases que es la computacion distribuida.", "--prompt", "-p", help="Pregunta"),
+    max_tokens: int = typer.Option(256, help="Maximo de tokens a generar"),
+    pensar: bool = typer.Option(False, "--pensar/--sin-pensar", help="Dejar que el modelo razone antes de contestar"),
 ):
-    """Envia una consulta de prueba al servidor OpenAI local o distribuido."""
-    endpoint = f"{url.rstrip('/')}/v1/chat/completions"
-    payload = {
-        "model": modelo,
-        "messages": [{"role": "user", "content": prompt}],
-        "stream": stream,
-    }
+    """Hace una pregunta al maestro y muestra la respuesta mientras se genera."""
+    from fabric.nodo import motores
 
-    console.print(f"[bold cyan]Enviando prompt a:[/bold cyan] {endpoint}")
-    console.print(f"[bold yellow]Modelo:[/bold yellow] {modelo}")
-    console.print(f"[bold green]Prompt:[/bold green] {prompt}\n")
-    console.print("-" * 60)
+    console.print(f"[bold]Preguntando a[/bold] {url}\n")
+
+    async def caso() -> dict[str, Any]:
+        motor = motores.Generar(url, max_tokens=max_tokens)
+
+        async def avance(texto: str) -> None:
+            sys.stdout.write(texto)
+            sys.stdout.flush()
+
+        try:
+            return await motor.correr({"prompt": prompt, "pensar": pensar, "temperatura": 0.3}, avance)
+        finally:
+            await motor.http.aclose()
 
     try:
-        if stream:
-            with httpx.Client(timeout=120) as client:
-                with client.stream("POST", endpoint, json=payload) as resp:
-                    if resp.status_code != 200:
-                        err_console.print(f"Error HTTP {resp.status_code}: {resp.read().decode('utf-8', errors='replace')}")
-                        return
-                    for linea in resp.iter_lines():
-                        if not linea or not linea.startswith("data:"):
-                            continue
-                        data_part = linea[5:].strip()
-                        if data_part == "[DONE]":
-                            break
-                        try:
-                            chunk = json.loads(data_part)
-                            delta = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
-                            if delta:
-                                sys.stdout.write(delta)
-                                sys.stdout.flush()
-                        except Exception:
-                            pass
-                    sys.stdout.write("\n")
-        else:
-            with httpx.Client(timeout=120) as client:
-                resp = client.post(endpoint, json=payload)
-                if resp.status_code != 200:
-                    err_console.print(f"Error HTTP {resp.status_code}: {resp.text}")
-                    return
-                data = resp.json()
-                contenido = data.get("choices", [{}])[0].get("message", {}).get("content", "")
-                console.print(contenido)
-
-        console.print("-" * 60)
-        console.print("[bold green]Inferencia completada con exito.[/bold green]")
+        r = asyncio.run(caso())
     except Exception as e:
-        err_console.print(f"Error al conectar con el servidor: {e}")
+        err_console.print(f"\nError al hablar con llama-server: {e}")
+        raise typer.Exit(code=1)
+    sys.stdout.write("\n")
+    console.print(
+        f"\n{r['tokens_entrada']} tokens de entrada, {r['tokens_salida']} de salida, "
+        f"{r['tokens_por_segundo']} tok/s, primer token a los {r['primer_token_s']} s, total {r['segundos']} s"
+    )
+
+
+@app.command()
+def transcribir(
+    archivo: Path = typer.Argument(..., help="Texto a transcribir (por ejemplo un libro en .txt)"),
+    url: str = typer.Option("http://127.0.0.1:59000", "--url", "-u", help="URL de llama-server (el del maestro)"),
+    flujos: int = typer.Option(1, help="Trozos a la vez (el maestro debe tener --paralelo igual o mayor)"),
+    chars: int = typer.Option(1500, help="Caracteres por trozo"),
+    desde: int = typer.Option(0, help="Primer trozo"),
+    cuantos: int = typer.Option(0, help="Cuantos trozos (0 = todos)"),
+    salida: Path = typer.Option(Path("transcripcion"), help="Carpeta donde guardar transcripcion.json y el texto copiado"),
+):
+    """El modelo de la red copia el texto trozo a trozo; cada trozo se compara letra por letra con el original."""
+    if not archivo.is_file():
+        err_console.print(f"Error: no existe {archivo}")
+        raise typer.Exit(code=1)
+    textos = transcripcion.trozos_de_archivo(archivo, chars)
+    textos = textos[desde: desde + cuantos] if cuantos else textos[desde:]
+    console.print(f"[bold]{len(textos)} trozos[/bold] ({sum(map(len, textos))} caracteres), {flujos} a la vez, contra {url}")
+
+    def avance(i: int, f: dict[str, Any]) -> None:
+        if "error" in f:
+            console.print(f"  trozo {i + 1}: [red]error[/red] {f['error']}")
+            return
+        marca = "[green]exacto[/green]" if f["exacto"] else f"[yellow]parecido {f['parecido']}[/yellow]"
+        console.print(f"  trozo {i + 1}: {marca}, {f['gen_n']} tokens a {(f['gen_tok_s'] or 0):.1f} tok/s, {f['pared_s']} s")
+
+    res = transcripcion.transcribir(url, textos, flujos=flujos, salida_dir=salida, al_terminar_trozo=avance)
+    tabla = Table(title="Transcripcion (medido)", show_header=False)
+    for k, v in res.items():
+        tabla.add_row(k, str(v))
+    console.print(tabla)
+    console.print(f"Guardado en {salida.resolve()}")
 
 
 if __name__ == "__main__":

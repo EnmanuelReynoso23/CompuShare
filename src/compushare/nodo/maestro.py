@@ -1,6 +1,6 @@
 """Modulo del Nodo Maestro / Coordinador de CompuShare.
 Gestiona el rele de orquestacion, la seleccion optima de trabajadores via calculo.py y reparto.py,
-y el servidor llama-server exponiendo la API compatible con OpenAI en 127.0.0.1.
+y el servidor llama-server en 127.0.0.1 (protocolo propio de llama.cpp: /completion, /apply-template).
 """
 
 from __future__ import annotations
@@ -126,7 +126,7 @@ class NodoMaestro:
         modelo: str | Path,
         rele_url: str = "ws://127.0.0.1:59095",
         clave: str = "",
-        puerto_openai: int = 59000,
+        puerto_api: int = 59000,
         puerto_rele: int | None = None,
         iniciar_rele_local: bool = True,
         llama_bin: str | Path | None = None,
@@ -136,13 +136,16 @@ class NodoMaestro:
         ctx_size: int = 4096,
         tubo_puerto_base: int = 59100,
         gpus_locales: int | None = None,
+        paralelo: int = 1,
+        especulativa: str = "",
+        espera_carga: float = 900.0,
     ) -> None:
         self.modelo = Path(modelo)
         if not self.modelo.is_file():
             raise FileNotFoundError(f"No existe el archivo de modelo: {self.modelo}")
         self.rele_url = rele_url
         self.clave = clave
-        self.puerto_openai = puerto_openai
+        self.puerto_api = puerto_api
 
         if puerto_rele is not None:
             self.puerto_rele = puerto_rele
@@ -158,6 +161,12 @@ class NodoMaestro:
         self.threads = max(1, min(6, threads))
         self.ctx_size = ctx_size
         self.tubo_puerto_base = tubo_puerto_base
+        self.paralelo = max(1, paralelo)
+        # Tipo de decodificacion especulativa de llama.cpp ("" = ninguna). Para copiar texto, ngram-mod
+        # adivina desde la propia entrada: medido 4-nov-2026, 5 nodos a 50 ms, 1,1 -> 4,9 tok/s.
+        self.especulativa = especulativa
+        # Cargar pesos por la red tarda: en Kaggle el maestro estuvo 142 s arrancando llama-server.
+        self.espera_carga = espera_carga
         self.gpus_locales = gpus_locales if gpus_locales is not None else contar_gpus_locales(llama_bin)
 
         self.server_proc: subprocess.Popen[Any] | None = None
@@ -278,15 +287,26 @@ class NodoMaestro:
             "--host",
             "127.0.0.1",
             "--port",
-            str(self.puerto_openai),
+            str(self.puerto_api),
             "-t",
             str(self.threads),
             "-c",
-            str(self.ctx_size),
+            str(self.ctx_size * self.paralelo),
+            "--parallel",
+            str(self.paralelo),
+            "-ngl",
+            "999",
+            "--split-mode",
+            "layer",
         ]
         if rpc_targets:
             cmd.extend(["--rpc", ",".join(rpc_targets)])
+            # Sin puntos de control ni cache de prompts: en modelos hibridos (Qwen3.5) copian el estado
+            # capa por capa con GET_TENSOR, una ida y vuelta por internet cada uno (medido: 3,3 -> 15,6 tok/s).
+            cmd.extend(["-ctxcp", "0", "--cache-ram", "0"])
             cmd.extend(reparto.salida_en_el_maestro(self.gpus_locales))
+        if self.especulativa:
+            cmd.extend(["--spec-type", self.especulativa])
         return cmd
 
     async def iniciar(self, duracion: float = 0.0) -> None:
@@ -298,13 +318,13 @@ class NodoMaestro:
         cmd = self.construir_comando_llama_server(rpc_targets)
         log.info("Iniciando llama-server con comando: %s", " ".join(cmd))
 
-        self.server_proc, self.registro_server = procesos.lanzar(cmd, f"llama-server-{self.puerto_openai}")
+        self.server_proc, self.registro_server = procesos.lanzar(cmd, f"llama-server-{self.puerto_api}")
         log.info("Registro de llama-server: %s", self.registro_server)
 
-        url_health = f"http://127.0.0.1:{self.puerto_openai}/health"
+        url_health = f"http://127.0.0.1:{self.puerto_api}/health"
         listo = False
         async with httpx.AsyncClient() as client:
-            fin = time.monotonic() + 30.0
+            fin = time.monotonic() + self.espera_carga
             while time.monotonic() < fin:
                 if self.server_proc.poll() is not None:
                     err = procesos.cola_registro(self.registro_server)
@@ -323,9 +343,9 @@ class NodoMaestro:
 
         if not listo:
             self.detener()
-            raise TimeoutError(f"llama-server no respondio en {url_health} tras 30 segundos")
+            raise TimeoutError(f"llama-server no respondio en {url_health} tras {self.espera_carga:.0f} segundos")
 
-        log.info("Servidor listo en http://127.0.0.1:%d/v1", self.puerto_openai)
+        log.info("Servidor listo en http://127.0.0.1:%d", self.puerto_api)
 
         try:
             if duracion > 0:

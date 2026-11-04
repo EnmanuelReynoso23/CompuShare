@@ -1,5 +1,5 @@
 """Pruebas de la red de punta a punta en la misma máquina: relé real, nodos reales
-con el motor `eco` y un `generar` contra un servidor OpenAI de mentira."""
+con el motor `eco` y un `generar` contra un llama-server de mentira."""
 
 from __future__ import annotations
 
@@ -191,20 +191,21 @@ def test_ritmo_corta_a_quien_inunda(monkeypatch):
     asyncio.run(caso())
 
 
-def test_motor_generar_lee_el_streaming_de_openai():
+def test_motor_generar_lee_el_streaming_de_llama_cpp():
     import httpx
 
     trozos = [
-        {"choices": [{"delta": {"content": "Hola"}}]},
-        {"choices": [{"delta": {"reasoning_content": "pensando"}}]},
-        {"choices": [{"delta": {"content": " mundo"}}]},
-        {"choices": [], "usage": {"prompt_tokens": 7, "completion_tokens": 2}},
+        {"content": "Hola", "stop": False},
+        {"content": " mundo", "stop": False},
+        {"content": "", "stop": True, "timings": {"prompt_n": 7, "predicted_n": 2}},
     ]
-    cuerpo = "".join(f"data: {json.dumps(t)}\n\n" for t in trozos) + "data: [DONE]\n\n"
+    cuerpo = "".join(f"data: {json.dumps(t)}\n\n" for t in trozos)
     pedidos = []
 
     def responder(pedido: httpx.Request) -> httpx.Response:
-        pedidos.append(json.loads(pedido.content))
+        pedidos.append((pedido.url.path, json.loads(pedido.content)))
+        if pedido.url.path == "/apply-template":
+            return httpx.Response(200, json={"prompt": "<|user|>hola<|assistant|>"})
         return httpx.Response(200, text=cuerpo, headers={"content-type": "text/event-stream"})
 
     async def caso():
@@ -219,8 +220,11 @@ def test_motor_generar_lee_el_streaming_de_openai():
         assert r["texto"] == "Hola mundo"
         assert "".join(partes) == "Hola mundo"
         assert r["tokens_salida"] == 2 and r["tokens_entrada"] == 7
-        assert pedidos[0]["chat_template_kwargs"] == {"enable_thinking": False}
-        assert pedidos[0]["messages"] == [{"role": "user", "content": "hola"}]
+        assert pedidos[0][0] == "/apply-template"
+        assert pedidos[0][1]["chat_template_kwargs"] == {"enable_thinking": False}
+        assert pedidos[0][1]["messages"] == [{"role": "user", "content": "hola"}]
+        assert pedidos[1][0] == "/completion"
+        assert pedidos[1][1]["prompt"] == "<|user|>hola<|assistant|>" and pedidos[1][1]["stream"] is True
 
     asyncio.run(caso())
 

@@ -26,7 +26,7 @@ una PC propia o un navegador con WebGPU. Sustituye a `p2p-neural-fabric` (Appwri
 | `tubo.py` | Tubo TCP por el relé (lado trabajador): ofrece un puerto de su 127.0.0.1 (un `ggml-rpc-server`) y el relé lo abre en el 127.0.0.1 del maestro. Sin compresión (con ella la carga iba 13 veces más lenta). |
 | `rpc_cache.py` | Arma la caché de `ggml-rpc-server -c` desde el GGUF del trabajador (FNV-1a de cada tensor > 10 MiB, verificado contra llama.cpp b12024): los pesos grandes no cruzan el túnel. |
 | `nodo/nodo.py` | Nodo: entra al relé con sus capacidades, late cada 10 s, atiende tareas con un semáforo por capacidad y se reconecta solo. |
-| `nodo/motores.py` | `eco`, `generar` (cualquier servidor OpenAI con streaming: llama.cpp, vLLM, Ollama), `embeber` y `reordenar` (sentence-transformers). |
+| `nodo/motores.py` | `eco`, `generar` (llama-server de llama.cpp, por su protocolo propio `/apply-template` + `/completion`), `embeber` y `reordenar` (sentence-transformers). |
 | `cliente.py` | Cliente Python (`ClienteRed`, `pedir_sync`). |
 | `kaggle/` | Cuaderno-nodo y `lanzar.py` para subirlo a Kaggle con GPU. |
 | `pruebas/` | `pytest` de punta a punta y `delegar.py`, que manda trabajo real a los nodos y escribe el informe. |

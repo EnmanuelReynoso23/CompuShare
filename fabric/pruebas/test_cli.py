@@ -202,7 +202,7 @@ def test_nodo_maestro_construir_comando(tmp_path: Path):
         maestro = NodoMaestro(
             modelo=modelo_dummy,
             clave="clave_test",
-            puerto_openai=59000,
+            puerto_api=59000,
             threads=10,  # Debe limitarse a 6
             gpus_locales=0,
         )
@@ -222,6 +222,19 @@ def test_nodo_maestro_construir_comando(tmp_path: Path):
         assert "127.0.0.1:59100" in cmd_rpc
         assert "-ot" in cmd_rpc
         assert any("token_embd|output" in arg for arg in cmd_rpc)
+        # Por la red: todas las capas repartidas y sin puntos de control (cada uno es una ida y vuelta)
+        assert cmd_rpc[cmd_rpc.index("-ngl") + 1] == "999"
+        assert cmd_rpc[cmd_rpc.index("-ctxcp") + 1] == "0"
+        assert cmd_rpc[cmd_rpc.index("--cache-ram") + 1] == "0"
+        assert "--spec-type" not in cmd_rpc
+
+    with patch("compushare.nodo.maestro.buscar_binario", return_value=Path("/bin/llama-server")):
+        maestro = NodoMaestro(modelo=modelo_dummy, clave="c", gpus_locales=0, paralelo=4,
+                              especulativa="ngram-mod", ctx_size=2048)
+        cmd = maestro.construir_comando_llama_server(["127.0.0.1:59100"])
+        assert cmd[cmd.index("--parallel") + 1] == "4"
+        assert cmd[cmd.index("-c") + 1] == str(2048 * 4)  # el contexto se reparte entre los flujos
+        assert cmd[cmd.index("--spec-type") + 1] == "ngram-mod"
 
 
 def test_extraer_modelo_info(tmp_path: Path):

@@ -29,7 +29,7 @@ INICIO = time.time()
 SALIDA = "/kaggle/working"
 TRABAJO = "/tmp/fabric"
 os.makedirs(TRABAJO, exist_ok=True)
-resumen = {"config": {k: v for k, v in CONFIG.items() if k != "clave"}, "etapas": {}}
+resumen = {"config": {k: v for k, v in CONFIG.items() if k not in ("clave", "trozos")}, "etapas": {}}
 
 
 def log(*a):
@@ -339,23 +339,35 @@ if rpc:
     # La tabla de salida en el maestro: si no, vuelve el vocabulario entero por la red en cada palabra.
     from fabric.reparto import salida_en_el_maestro
     comando += salida_en_el_maestro(len(gpus))
-if CONFIG.get("especulativo"):
-    comando += ["--spec-type", CONFIG["especulativo"]]
-log("arrancando:", " ".join(comando[1:]))
-registro = open(f"{SALIDA}/llama-server.log", "w")
-servidor = subprocess.Popen(comando, stdout=registro, stderr=subprocess.STDOUT, env=entorno, cwd=os.path.dirname(binario))
+# Si un tipo de especulativa no arranca en esta versión de llama.cpp, se prueba el siguiente
+# (así un flag no soportado no tira la sesión entera de Kaggle).
+opciones_spec = [CONFIG.get("especulativo", "")] + [s for s in CONFIG.get("especulativo_alternativas", [])
+                                                    if s != CONFIG.get("especulativo", "")]
+resumen["spec_intentos"] = []
 listo = False
-for _ in range(3600 if puerto_tubo else 900):
-    if servidor.poll() is not None:
+for spec in opciones_spec:
+    comando_spec = comando + (["--spec-type", spec] if spec else [])
+    log("arrancando:", " ".join(comando_spec[1:]))
+    registro = open(f"{SALIDA}/llama-server.log", "w")
+    servidor = subprocess.Popen(comando_spec, stdout=registro, stderr=subprocess.STDOUT, env=entorno, cwd=os.path.dirname(binario))
+    for _ in range(3600 if puerto_tubo else 900):
+        if servidor.poll() is not None:
+            break
+        try:
+            with urllib.request.urlopen("http://127.0.0.1:8080/health", timeout=2) as rr:
+                if rr.status == 200:
+                    listo = True
+                    break
+        except Exception:
+            pass
+        time.sleep(1)
+    resumen["spec_intentos"].append({"spec": spec, "arranco": listo})
+    if listo:
+        resumen["spec_usada"] = spec
         break
-    try:
-        with urllib.request.urlopen("http://127.0.0.1:8080/health", timeout=2) as rr:
-            if rr.status == 200:
-                listo = True
-                break
-    except Exception:
-        pass
-    time.sleep(1)
+    servidor.kill()
+    registro.close()
+    shutil.copy(f"{SALIDA}/llama-server.log", f"{SALIDA}/llama-server-fallo-{spec or 'ninguna'}.log")
 if not listo:
     registro.flush()
     resumen["error"] = "llama-server no arrancó: " + open(f"{SALIDA}/llama-server.log").read()[-3000:]
@@ -401,6 +413,38 @@ except Exception as e:
     diagnostico["local_error"] = repr(e)[:100]
 resumen["diagnostico"] = diagnostico
 log("diagnóstico:", diagnostico)
+
+# ── 4c. transcribir un libro (CONFIG["trozos"]) con compushare.transcribir ─
+# El modelo repartido copia cada trozo; se compara letra por letra con el original y se guarda
+# transcripcion.json y libro_transcrito.txt después de cada trozo (si la sesión se corta, queda lo hecho).
+if CONFIG.get("trozos"):
+    sys.path.insert(0, f"{TRABAJO}/codigo/src")
+    from compushare import transcribir as transcripcion  # noqa: E402
+
+    tubo_ini = salud_local()["tubo_bytes"] if puerto_tubo else 0
+    # Dejar de empezar trozos 10 min antes del final: el trabajador tiene que seguir vivo.
+    restante = CONFIG["duracion_min"] * 60 - (time.time() - INICIO) - 600
+
+    def al_trozo(i, fila):
+        log(f"trozo {i + 1}/{len(CONFIG['trozos'])}:", {k: v for k, v in fila.items() if k != "salida"})
+
+    log(f"transcribiendo {len(CONFIG['trozos'])} trozos con {CONFIG['paralelo']} flujos")
+    t = time.time()
+    res = transcripcion.transcribir("http://127.0.0.1:8080", CONFIG["trozos"], flujos=CONFIG["paralelo"],
+                                    salida_dir=SALIDA, limite_s=restante, al_terminar_trozo=al_trozo)
+    res["spec"] = resumen.get("spec_usada")
+    res["tubo_mb"] = round((salud_local()["tubo_bytes"] - tubo_ini) / 1e6, 1) if puerto_tubo else 0
+    resumen["transcripcion"] = res
+    etapa("transcribir", t)
+    log("transcripción:", res)
+    guardar_resumen()
+    if CONFIG.get("solo_transcribir"):
+        servidor.terminate()
+        registro.close()
+        shutil.copy(f"{SALIDA}/llama-server.log", f"{SALIDA}/llama-server-final.log")
+        guardar_resumen()
+        log("fin")
+        sys.exit(0)
 
 # ── 5. dentro de la red ─────────────────────────────────────────────────────
 import asyncio  # noqa: E402
