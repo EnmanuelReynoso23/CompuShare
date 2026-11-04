@@ -3,6 +3,8 @@
 import asyncio
 import os
 import pytest
+
+pytest.importorskip("aiortc", reason="instalar con: pip install compushare[directo]")
 from websockets.asyncio.server import serve
 
 from fabric.directo.canal import CanalWebRTC
