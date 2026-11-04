@@ -47,8 +47,9 @@ una PC propia o un navegador con WebGPU. Sustituye a `p2p-neural-fabric` (Appwri
 | nodo | `parcial` / `resultado` / `error` | `id`, `datos` o `mensaje` (el relé los reenvía a quien pidió, con `nodo`) |
 | cualquiera | `cancelar` | `id` |
 | cliente | `mensaje` / `responder` | sala del chat; solo el autor cierra su mensaje |
+| cualquiera | `senalar` | `para` (id destino), `datos` (payload ICE/SDP P2P); el relé lo reenvía con `de: <id_origen>` |
 
-Errores que devuelve el relé: `sin_nodos`, `tarea_invalida`, `nodo_desconectado`, `vencida` (15 min).
+Errores que devuelve el relé: `sin_nodos`, `tarea_invalida`, `nodo_desconectado`, `vencida` (15 min), `destino_no_encontrado` (en señalización P2P).
 Un `id` pedido se respeta si nadie más lo tiene abierto (así el navegador conserva su id al pasar a donar).
 
 ## Dónde corre (31-oct-2026)
