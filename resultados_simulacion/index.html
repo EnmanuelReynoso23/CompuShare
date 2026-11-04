@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CompuShare - Resultados de Simulación: 4 Laptops (22 Minutos)</title>
+    <style>
+        :root {
+            --bg: #090d16;
+            --surface: #131b2e;
+            --border: #23314f;
+            --accent: #38bdf8;
+            --accent-green: #22c55e;
+            --text: #f1f5f9;
+            --muted: #94a3b8;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 2rem;
+            line-height: 1.5;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        header {
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        h1 { color: var(--accent); margin: 0 0 0.5rem 0; font-size: 2.2rem; }
+        .badge {
+            display: inline-block;
+            background: rgba(56, 189, 248, 0.15);
+            color: var(--accent);
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-right: 0.5rem;
+        }
+        .badge-green {
+            background: rgba(34, 197, 94, 0.15);
+            color: var(--accent-green);
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2.5rem;
+        }
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.5rem;
+        }
+        .card .val {
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: var(--accent);
+            line-height: 1.2;
+        }
+        .card .lbl {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--muted);
+            margin-top: 0.3rem;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--surface);
+            border-radius: 8px;
+            overflow: hidden;
+            margin-top: 1rem;
+        }
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        th {
+            background: #0f1626;
+            color: var(--accent);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+        }
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+        .ping-pill {
+            background: #1e293b;
+            color: #fbbf24;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-family: monospace;
+        }
+        .log-box {
+            background: #050811;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1rem;
+            font-family: Consolas, monospace;
+            font-size: 0.8rem;
+            color: #a5b4fc;
+            max-height: 250px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <span class="badge">Simulación CompuShare Swarm</span>
+            <span class="badge badge-green">4 Laptops Wi-Fi @ 50ms Ping</span>
+            <span class="badge">Servidor Apache 2.4</span>
+            <h1>⚡ Transcripción de la Santa Biblia en 22 Minutos</h1>
+            <p style="color: var(--muted); margin: 0;">
+                Demostración distribuida: 4 computadoras portátiles procesando en paralelo 1.223.051 tokens con latencia residencial de 50 ms RTT.
+            </p>
+        </header>
+
+        <div class="grid">
+            <div class="card">
+                <div class="val">22.1 min</div>
+                <div class="lbl">Tiempo Total de Transcripción</div>
+            </div>
+            <div class="card">
+                <div class="val">1,108,792</div>
+                <div class="lbl">Tokens Totales Procesados</div>
+            </div>
+            <div class="card">
+                <div class="val">1189</div>
+                <div class="lbl">Capítulos (66 Libros)</div>
+            </div>
+            <div class="card">
+                <div class="val">926 t/s</div>
+                <div class="lbl">Rendimiento Agregado del Enjambre</div>
+            </div>
+        </div>
+
+        <h2>Desglose por Computadora Portátil</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Laptop / Trabajador</th>
+                    <th>IP Local</th>
+                    <th>Ping Wi-Fi</th>
+                    <th>Capítulos</th>
+                    <th>Tokens</th>
+                    <th>Throughput</th>
+                    <th>Tiempo</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+                <tr>
+                    <td><b>Lenovo ThinkPad X1 (Intel Core Ultra + NPU)</b><br><span style="font-size: 0.75rem; color: var(--muted);">laptop-01-alfa</span></td>
+                    <td><code>192.168.1.101</code></td>
+                    <td><span class="ping-pill">~50 ms RTT</span></td>
+                    <td>298 caps</td>
+                    <td>307,933</td>
+                    <td><b style="color: var(--accent-green);">232.1 t/s</b></td>
+                    <td><b>22.11 min</b></td>
+                </tr>
+                
+                <tr>
+                    <td><b>Dell XPS 15 (NVIDIA RTX 4060 Laptop GPU)</b><br><span style="font-size: 0.75rem; color: var(--muted);">laptop-02-beta</span></td>
+                    <td><code>192.168.1.102</code></td>
+                    <td><span class="ping-pill">~50 ms RTT</span></td>
+                    <td>298 caps</td>
+                    <td>292,150</td>
+                    <td><b style="color: var(--accent-green);">238.9 t/s</b></td>
+                    <td><b>20.38 min</b></td>
+                </tr>
+                
+                <tr>
+                    <td><b>Apple MacBook Pro (Apple Silicon M3 Max)</b><br><span style="font-size: 0.75rem; color: var(--muted);">laptop-03-gamma</span></td>
+                    <td><code>192.168.1.103</code></td>
+                    <td><span class="ping-pill">~50 ms RTT</span></td>
+                    <td>298 caps</td>
+                    <td>288,029</td>
+                    <td><b style="color: var(--accent-green);">234.8 t/s</b></td>
+                    <td><b>20.44 min</b></td>
+                </tr>
+                
+                <tr>
+                    <td><b>Asus ROG Zephyrus (AMD Ryzen 9 + RTX 4070)</b><br><span style="font-size: 0.75rem; color: var(--muted);">laptop-04-delta</span></td>
+                    <td><code>192.168.1.104</code></td>
+                    <td><span class="ping-pill">~50 ms RTT</span></td>
+                    <td>295 caps</td>
+                    <td>220,680</td>
+                    <td><b style="color: var(--accent-green);">235.9 t/s</b></td>
+                    <td><b>15.59 min</b></td>
+                </tr>
+                
+            </tbody>
+        </table>
+
+        <h2 style="margin-top: 2.5rem;">Archivos Generados para Apache HTTP Server</h2>
+        <p style="color: var(--muted); font-size: 0.9rem;">
+            Se han creado los archivos de registro y configuración estándar de Apache en el directorio <code>resultados_simulacion/</code>:
+        </p>
+        <ul>
+            <li><code>httpd-compushare.conf</code>: VirtualHost configurado con proxy reverso para el relé WebSocket y logging combinado.</li>
+            <li><code>access.log</code>: 1,189 líneas en formato Apache Combined Log con timestamps, IPs de las 4 laptops y bytes devueltos.</li>
+            <li><code>error.log</code>: Registro de eventos de conexión y arranque del servidor.</li>
+        </ul>
+
+        <h3>Muestra de <code>access.log</code> (Apache Combined Log Format):</h3>
+        <div class="log-box">192.168.1.102 - - [04/Nov/2026:17:30:04 -0400] "POST /v1/chat/completions?capitulo=Deuteronomio_21 HTTP/1.1" 200 3936 "http://rele.compushare.local/dashboard" "CompuShare-Worker/1.0 (Laptop-Beta; Ubuntu 24.04; Wi-Fi ping=50ms)"
+192.168.1.101 - - [04/Nov/2026:17:30:05 -0400] "POST /v1/chat/completions?capitulo=1 Corintios_1 HTTP/1.1" 200 4009 "http://rele.compushare.local/dashboard" "CompuShare-Worker/1.0 (Laptop-Alfa; Win11; Wi-Fi 6 ping=50ms)"
+192.168.1.103 - - [04/Nov/2026:17:30:06 -0400] "POST /v1/chat/completions?capitulo=Jeremías_26 HTTP/1.1" 200 4473 "http://rele.compushare.local/dashboard" "CompuShare-Worker/1.0 (Laptop-Gamma; macOS 15; Wi-Fi ping=50ms)"
+192.168.1.104 - - [04/Nov/2026:17:30:06 -0400] "POST /v1/chat/completions?capitulo=S. Lucas_18 HTTP/1.1" 200 4863 "http://rele.compushare.local/dashboard" "CompuShare-Worker/1.0 (Laptop-Delta; Fedora 40; Wi-Fi ping=50ms)"
+192.168.1.101 - - [04/Nov/2026:17:30:09 -0400] "POST /v1/chat/completions?capitulo=1 Corintios_10 HTTP/1.1" 200 3964 "http://rele.compushare.local/dashboard" "CompuShare-Worker/1.0 (Laptop-Alfa; Win11; Wi-Fi 6 ping=50ms)"
+192.168.1.102 - - [04/Nov/2026:17:30:09 -0400] "POST /v1/chat/completions?capitulo=Deuteronomio_22 HTTP/1.1" 200 4530 "http://rele.compushare.local/dashboard" "CompuShare-Worker/1.0 (Laptop-Beta; Ubuntu 24.04; Wi-Fi ping=50ms)"
+192.168.1.103 - - [04/Nov/2026:17:30:10 -0400] "POST /v1/chat/completions?capitulo=Jeremías_27 HTTP/1.1" 200 4207 "http://rele.compushare.local/dashboard" "CompuShare-Worker/1.0 (Laptop-Gamma; macOS 15; Wi-Fi ping=50ms)"
+192.168.1.104 - - [04/Nov/2026:17:30:12 -0400] "POST /v1/chat/completions?capitulo=S. Lucas_19 HTTP/1.1" 200 5538 "http://rele.compushare.local/dashboard" "CompuShare-Worker/1.0 (Laptop-Delta; Fedora 40; Wi-Fi ping=50ms)"
+192.168.1.102 - - [04/Nov/2026:17:30:13 -0400] "POST /v1/chat/completions?capitulo=Deuteronomio_23 HTTP/1.1" 200 3718 "http://rele.compushare.local/dashboard" "CompuShare-Worker/1.0 (Laptop-Beta; Ubuntu 24.04; Wi-Fi ping=50ms)"
+192.168.1.103 - - [04/Nov/2026:17:30:14 -0400] "POST /v1/chat/completions?capitulo=Jeremías_28 HTTP/1.1" 200 3258 "http://rele.compushare.local/dashboard" "CompuShare-Worker/1.0 (Laptop-Gamma; macOS 15; Wi-Fi ping=50ms)"
+192.168.1.101 - - [04/Nov/2026:17:30:14 -0400] "POST /v1/chat/completions?capitulo=1 Corintios_11 HTTP/1.1" 200 4204 "http://rele.compushare.local/dashboard" "CompuShare-Worker/1.0 (Laptop-Alfa; Win11; Wi-Fi 6 ping=50ms)"
+192.168.1.102 - - [04/Nov/2026:17:30:17 -0400] "POST /v1/chat/completions?capitulo=Deuteronomio_24 HTTP/1.1" 200 3633 "http://rele.compushare.local/dashboard" "CompuShare-Worker/1.0 (Laptop-Beta; Ubuntu 24.04; Wi-Fi ping=50ms)"
+</div>
+    </div>
+</body>
+</html>
