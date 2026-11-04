@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CompuShare: Estado y Pendientes</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --heading: #f0f6fc;
+      --accent: #58a6ff;
+      --code-bg: #1f242c;
+      --table-stripe: #12161c;
+      --table-header: #21262d;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #ffffff;
+        --card-bg: #f6f8fa;
+        --border: #d0d7de;
+        --text: #24292f;
+        --heading: #1f2328;
+        --accent: #0969da;
+        --code-bg: #eff1f3;
+        --table-stripe: #f6f8fa;
+        --table-header: #eaeef2;
+      }
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      background-color: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 2rem 1rem;
+    }
+    .container {
+      max-width: 920px;
+      margin: 0 auto;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 2.5rem;
+    }
+    h1, h2, h3, h4 {
+      color: var(--heading);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.3em;
+    }
+    h1 {
+      font-size: 2rem;
+      margin-top: 0;
+    }
+    h2 {
+      font-size: 1.4rem;
+      margin-top: 2rem;
+    }
+    h3 {
+      font-size: 1.15rem;
+      border-bottom: none;
+      margin-top: 1.5rem;
+    }
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.2rem 0;
+      font-size: 0.95rem;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      text-align: left;
+    }
+    th {
+      background-color: var(--table-header);
+      color: var(--heading);
+      font-weight: 600;
+    }
+    tr:nth-child(even) {
+      background-color: var(--table-stripe);
+    }
+    code {
+      font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+      font-size: 85%;
+      background-color: var(--code-bg);
+      padding: 0.2em 0.4em;
+      border-radius: 4px;
+    }
+    pre {
+      background-color: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem;
+      overflow-x: auto;
+    }
+    pre code {
+      background: none;
+      padding: 0;
+      font-size: 0.9rem;
+    }
+    ul, ol {
+      padding-left: 1.5rem;
+    }
+    li {
+      margin-bottom: 0.35rem;
+    }
+    hr {
+      border: 0;
+      height: 1px;
+      background: var(--border);
+      margin: 2rem 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Computadora compartida (CompuShare): estado y pendientes</h1>
+
+    <h2>Resumen</h2>
+    <p>CompuShare junta varias computadoras para correr UN modelo que no cabe en ninguna sola, para que SynRAG le pregunte a la red. Al 4-nov el plan (fases F0-F9) está escrito, 11 de 16 tareas de agentes están entregadas y la meta inmediata es juntar todo en <code>main</code> y hacer la prueba final en Kaggle (F9).</p>
+    <ul>
+      <li><strong>Decisiones tomadas el 4-nov</strong>: un solo repo (fabric absorbido), red de confianza primero, modelo objetivo Qwen3.8-27B UD-Q4_K_M (16,5 GB), Kaggle permitido.</li>
+      <li><strong>Hallazgo más fuerte del día</strong>: dejar la tabla de salida en el maestro baja de 993 KB a 4,1 KB por palabra (64 veces menos).</li>
+      <li><strong>Lo que no funciona como lo propuso Gemini</strong>: repartir expertos MoE por temas, esperar que más nodos aceleren UNA respuesta, y prometer 10x con especulativa (se midió 1,18x en red de amigos).</li>
+      <li><strong>Sincronización</strong>: ramas y commits sincronizados con el repositorio central.</li>
+    </ul>
+
+    <hr>
+
+    <h2>Dónde está todo</h2>
+    <p>El repo público <a href="https://github.com/EnmanuelReynoso23/CompuShare">EnmanuelReynoso23/CompuShare</a> contiene las ramas y el código de desarrollo.</p>
+    <table>
+      <thead>
+        <tr><th>Qué</th><th>Ruta</th><th>Nota</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Repo principal</td><td><code>~/Proyectos/CompuShare</code></td><td>rama <code>main</code>; <code>PLAN.md</code> con fases F0-F9 y tabla de agentes A1-A13</td></tr>
+        <tr><td>Plan y fases</td><td><code>~/Proyectos/CompuShare/PLAN.md</code></td><td>F0-F9 y tabla de agentes A1-A13</td></tr>
+        <tr><td>Matemática calibrada</td><td><code>~/Proyectos/CompuShare/docs/MATEMATICA.md</code></td><td>modelo contra Kaggle: 156 ms calculados vs 147-150 medidos</td></tr>
+        <tr><td>Estado del arte</td><td><code>~/Proyectos/CompuShare/docs/ESTADO-DEL-ARTE.md</code></td><td>Petals, exo, prima.cpp, dllama, ggml-rpc</td></tr>
+        <tr><td>Código de red (ex synrag-fabric)</td><td><code>~/Proyectos/CompuShare/fabric/</code></td><td>traído con <code>git subtree</code>, historial completo</td></tr>
+        <tr><td>CLI</td><td><code>~/Proyectos/CompuShare/src/compushare</code></td><td>esqueleto en <code>main</code>; versión real en rama <code>a8-cli</code></td></tr>
+        <tr><td>Worktrees de agentes</td><td><code>~/Proyectos/cs-a1</code> ... <code>~/Proyectos/cs-a16</code></td><td>uno por agente, rama <code>a&lt;N&gt;-&lt;tema&gt;</code></td></tr>
+        <tr><td>Tareas, reglas y logs</td><td><code>~/Proyectos/cs-agentes</code></td><td><code>REGLAS.md</code>, <code>a&lt;N&gt;.md</code>, <code>a&lt;N&gt;.log</code>, <code>cola.sh</code></td></tr>
+        <tr><td>llama.cpp con RPC (CPU)</td><td><code>~/.local/opt/llama.cpp/build/bin</code></td><td><code>rpc-server</code>, <code>llama-server</code></td></tr>
+        <tr><td>Entorno Python</td><td><code>~/Proyectos/CompuShare/.venv</code></td><td>creado con <code>uv</code></td></tr>
+        <tr><td>Registros de <code>llama-server</code></td><td><code>~/.cache/compushare/registros</code></td><td>los escribe la CLI de A8</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Ramas y su estado</h3>
+    <table>
+      <thead>
+        <tr><th>Rama</th><th>Agente</th><th>En <code>main</code></th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>a1-simulador-red</code></td><td>A1 simulador de red</td><td>sí</td></tr>
+        <tr><td><code>a4-perfil-rele</code></td><td>A4 perfil del relé</td><td>sí</td></tr>
+        <tr><td><code>a9-conexion-casas</code></td><td>A9 conexión directa (aiortc)</td><td>sí</td></tr>
+        <tr><td><code>a10-verificacion</code></td><td>A10 (tabla de salida)</td><td>sí</td></tr>
+        <tr><td><code>a11-moe</code></td><td>A11 MoE</td><td>sí</td></tr>
+        <tr><td><code>a14-estado-del-arte</code></td><td>A14 estado del arte</td><td>sí</td></tr>
+        <tr><td><code>a2-escenario</code></td><td>A2 escenarios N nodos</td><td>no (1 commit)</td></tr>
+        <tr><td><code>a7-especulativa</code></td><td>A7 especulativa MTP</td><td>no (1 commit)</td></tr>
+        <tr><td><code>a15-tubo-go</code></td><td>A15 relé y tubo en Go</td><td>no (1 commit)</td></tr>
+        <tr><td><code>a16-directo-go</code></td><td>A16 directo P2P en Go</td><td>no (1 commit)</td></tr>
+        <tr><td><code>a8-cli</code></td><td>A8 CLI real</td><td>no (commit WIP <code>7ffc9cb</code>)</td></tr>
+      </tbody>
+    </table>
+
+    <hr>
+
+    <h2>Lo hecho y lo medido</h2>
+    <p>Todas las cifras son medidas (no estimadas); cada una sale del informe <code>INFORME-A&lt;N&gt;.md</code> de su worktree.</p>
+    <table>
+      <thead>
+        <tr><th>Fecha</th><th>Trabajo</th><th>Resultado clave</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>4-nov</td><td>A7 especulativa MTP</td><td>mejor k = 4: 410,5 ms por palabra (2,44 tok/s), 1,18x frente a sin especulativa; mover MTP al maestro con <code>-ot</code> lo empeora (946,7 ms)</td></tr>
+        <tr><td>4-nov</td><td>A15 relé y tubo en Go</td><td>ida y vuelta 0,081 ms (Python) a 0,043 ms (Go); 37,94 tok/s en local frente a 35,42 con el tubo Python</td></tr>
+        <tr><td>4-nov</td><td>A2 escenarios N nodos</td><td>N=2: 27,8 tok/s sin retraso, 5,66 en misma ciudad (20 ms), 2,31 en mismo país (80 ms); 1098,5 KB por palabra</td></tr>
+        <tr><td>4-nov</td><td>A16 directo P2P en Go</td><td>ICE + QUIC, clasificador de NAT, modo tubo <code>compushare-directo</code></td></tr>
+        <tr><td>4-nov</td><td>Tabla de salida en el maestro</td><td>993 KB a 4,1 KB por palabra (64x); unos 800 ms menos por palabra con 10 Mb/s; ya en el nodo de Kaggle</td></tr>
+        <tr><td>4-nov</td><td>A4 perfil del relé</td><td>el tubo pierde 24,7 % (28,33 a 21,33 tok/s); causa: 8-14 mensajes de ida y vuelta por palabra en RPC</td></tr>
+        <tr><td>4-nov</td><td>A11 MoE (OLMoE-1B-7B)</td><td>repartir por expertos = un salto por capa: 0,26 tok/s en OLMoE con 237 ms; local 20,25 tok/s</td></tr>
+        <tr><td>4-nov</td><td>A14 estado del arte</td><td>fórmula de pipelining calibrada contra Kaggle, Petals, prima.cpp y dllama</td></tr>
+        <tr><td>4-nov</td><td>A9 conexión directa (aiortc + STUN)</td><td>prototipo WebRTC con caída al relé</td></tr>
+        <tr><td>4-nov</td><td>A1 simulador de red</td><td><code>fabric/simulador/red.py</code>: latencia, variación, ancho de banda y pérdida por enlace, sin root</td></tr>
+        <tr><td>4-nov</td><td>A8 CLI (WIP)</td><td>55 pruebas en verde; prueba de punta a punta con trabajador: 26,3 tok/s con Qwen3.5-0.8B</td></tr>
+        <tr><td>31-oct</td><td>Kaggle, Qwen3.5-9B Q8_0 en 2 cuadernos</td><td>147-150 ms por palabra; 10,3-10,8 tok/s con MTP; 6,8-6,9 tok/s por el relé</td></tr>
+        <tr><td>31-oct</td><td>Túnel de Cloudflare</td><td>237 ms de ida y vuelta (una medición)</td></tr>
+      </tbody>
+    </table>
+
+    <hr>
+
+    <h2>Arquitectura y decisiones</h2>
+    <p>El modelo se reparte por capas con llama.cpp RPC: cada palabra recorre los nodos en fila, así que el tiempo por palabra es cálculo + N x ida y vuelta. La ganancia está en atender muchas respuestas a la vez, no en acelerar una.</p>
+    <p><strong>Camino de una palabra:</strong></p>
+    <ol>
+      <li>El maestro corre <code>llama-server</code> con <code>--rpc</code> y se queda con la tabla de salida (<code>fabric.reparto.salida_en_el_maestro()</code>).</li>
+      <li>La activación sale por el tubo (<code>fabric/tubo.py</code>, o <code>compushare-tubo</code> en Go).</li>
+      <li>Cruza por el relé WebSocket (<code>fabric/rele/rele.py</code> tras un túnel <code>trycloudflare</code>) o por conexión directa (<code>compushare-directo</code>, ICE + QUIC; caída al relé si falla).</li>
+      <li>En cada trabajador, <code>rpc-server</code> calcula sus capas y devuelve el resultado al siguiente nodo.</li>
+    </ol>
+
+    <h3>Prioridades según <code>docs/MATEMATICA.md</code></h3>
+    <p>Entre amigos (27B Q4, 40 ms, 10 Mb/s de subida): 2,8 palabras/s hoy; 7,2 si solo viaja la activación; unas 20 con especulativa sin viajes extra.</p>
+    <ol>
+      <li>Bajar bytes por palabra (siguiente: activación en f16 y reutilizar el grafo).</li>
+      <li>Especulativa sin viajes extra.</li>
+      <li>Varios flujos a la vez (<code>--parallel N</code>).</li>
+      <li>Elegir los nodos con <code>fabric/calculo.elegir_optimo</code>.</li>
+      <li>MoE repartido por capas, nunca por expertos.</li>
+    </ol>
+
+    <h3>Decisiones tomadas (4-nov)</h3>
+    <table>
+      <thead><tr><th>Decisión</th><th>Elegido</th></tr></thead>
+      <tbody>
+        <tr><td>D1. Repos</td><td>Un solo repo: fabric absorbido con historial; synrag-fabric queda archivado</td></tr>
+        <tr><td>D2. Red</td><td>Primero de confianza: tus máquinas, Kaggle y amigos</td></tr>
+        <tr><td>D3. Modelo</td><td>Qwen3.8-27B UD-Q4_K_M (16,5 GB)</td></tr>
+        <tr><td>Kaggle</td><td>Permitido para pruebas</td></tr>
+        <tr><td>Privacidad</td><td>No se promete con nodos desconocidos: los estados intermedios dejan reconstruir la entrada</td></tr>
+        <tr><td>Números públicos</td><td>Solo en <code>CLAIMS.md</code> con fecha, comando y archivo de resultado</td></tr>
+      </tbody>
+    </table>
+
+    <hr>
+
+    <h2>Pendientes exactos y decisiones abiertas</h2>
+    <h3>Tareas en curso y agentes pendientes</h3>
+    <ol>
+      <li><strong>A8 (<code>compushare</code> CLI)</strong>:
+        <ul>
+          <li>Rama: <code>a8-cli</code> con commit WIP <code>7ffc9cb</code>. 55 pruebas en verde.</li>
+          <li>Resuelto: Fuga de memoria en pruebas (no más OOM por 16,5 GB en RAM), redirección de salida de <code>llama-server</code> a <code>~/.cache/compushare/registros</code> para evitar bloqueo de buffers de tuberías, <code>SIGTERM</code> y <code>PR_SET_PDEATHSIG</code> para prevenir hijos huérfanos.</li>
+          <li>Pendiente: Confirmar apagado limpio (<code>SIGTERM</code>/<code>SIGKILL</code>), repetir y registrar medición punta a punta con trabajador (había dado 26,3 tok/s con Qwen3.5-0.8B) y escribir <code>INFORME-A8.md</code>.</li>
+        </ul>
+      </li>
+      <li><strong>A10 (Verificación de nodos)</strong>:
+        <ul>
+          <li>Pendiente de implementación tras interrupción previa por OOM.</li>
+          <li>Objetivo: Verificación probabilística muestreando capas al azar en otro nodo para detectar manipulaciones o fallas.</li>
+        </ul>
+      </li>
+      <li><strong>Integración a <code>main</code></strong>:
+        <ul>
+          <li>Ramas terminadas listas para juntar: <code>a2-escenario</code>, <code>a7-especulativa</code>, <code>a15-tubo-go</code>, <code>a16-directo-go</code>.</li>
+          <li>Rama <code>a8-cli</code> tras validación final.</li>
+        </ul>
+      </li>
+      <li><strong>Fase F9 (Prueba de escala en Kaggle)</strong>:
+        <ul>
+          <li>Qwen3.8-27B dividido entre cuadernos (2x T4).</li>
+          <li>Inyección de perfiles de red del simulador A1 (misma ciudad 20 ms, mismo país 80 ms, intercontinental, Cloudflare).</li>
+          <li>Tabla comparativa de tok/s reales frente a la proyección de <code>docs/MATEMATICA.md</code>.</li>
+        </ul>
+      </li>
+    </ol>
+
+    <h3>Decisiones técnicas abiertas</h3>
+    <ul>
+      <li><strong>Transporte por defecto</strong>: Determinar si el tubo en Go (A15, 0,043 ms RTT vs 0,081 ms Python; 37,94 vs 35,42 tok/s) sustituye al tubo Python como opción principal en el empaquetado.</li>
+      <li><strong>Estrategia P2P</strong>: Criterio de fallback automático de ICE + QUIC (<code>compushare-directo</code>) al relé WebSocket cuando ambos extremos estén tras NAT simétrico.</li>
+      <li><strong>Distribución de binarios</strong>: Estrategia de descarga o compilación de binarios Go para entornos efímeros (Kaggle, Colab) sin Go instalado.</li>
+    </ul>
+
+    <hr>
+
+    <h2>Cómo retomarlo en otra máquina</h2>
+
+    <h3>1. Clonar el repositorio y ramas</h3>
+    <pre><code>git clone https://github.com/EnmanuelReynoso23/CompuShare.git
+cd CompuShare
+git fetch origin --all</code></pre>
+
+    <h3>2. Entorno Python y dependencias</h3>
+    <pre><code># Crear entorno virtual con uv o python venv
+uv venv .venv
+source .venv/bin/activate
+
+# Instalar dependencias base y de desarrollo
+uv pip install -e ".[dev]"
+
+# Opcional: soporte para conexión directa P2P (WebRTC)
+uv pip install -e ".[directo]"</code></pre>
+
+    <h3>3. Binarios nativos necesarios</h3>
+    <pre><code># llama.cpp con RPC
+git clone https://github.com/ggerganov/llama.cpp
+cd llama.cpp
+cmake -B build -DGGML_RPC=ON -DGGML_CUDA=OFF
+cmake --build build --config Release -j$(nproc)
+
+# Binarios en Go (opcional, para máxima velocidad)
+cd fabric/go
+go build -o ../../bin/compushare-tubo ./cmd/tubo
+go build -o ../../bin/compushare-directo ./cmd/directo</code></pre>
+
+    <h3>4. Ejecutar pruebas unitarias</h3>
+    <pre><code>pytest fabric/pruebas/</code></pre>
+
+    <h3>5. Levantar prueba básica dividida</h3>
+    <pre><code># Terminal 1: Iniciar servidor RPC en el trabajador
+rpc-server -H 0.0.0.0 -p 50052
+
+# Terminal 2: Iniciar servidor maestro con capas divididas
+llama-server -m /ruta/al/modelo.gguf --rpc 127.0.0.1:50052 -p 8080 --host 0.0.0.0</code></pre>
+
+    <h3>6. Simular escenarios de red entre casas</h3>
+    <pre><code># Ejemplo: 2 nodos simulando latencia de la misma ciudad (20 ms)
+python -m fabric.simulador.escenario --nodos 2 --perfil misma_ciudad</code></pre>
+  </div>
+</body>
+</html>
