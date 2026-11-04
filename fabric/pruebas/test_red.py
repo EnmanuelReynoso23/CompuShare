@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import socket
 from contextlib import asynccontextmanager
 
@@ -27,11 +28,16 @@ def puerto_libre() -> int:
 
 @asynccontextmanager
 async def red(*nodos_motores: list):
-    puerto = puerto_libre()
-    listo = asyncio.Event()
-    servidor = asyncio.create_task(modulo_rele.principal(CLAVE, puerto, listo))
-    await asyncio.wait_for(listo.wait(), 5)
-    url = f"ws://127.0.0.1:{puerto}"
+    url_externa = os.environ.get("FABRIC_TEST_RELE_URL")
+    if url_externa:
+        url = url_externa
+        servidor = None
+    else:
+        puerto = puerto_libre()
+        listo = asyncio.Event()
+        servidor = asyncio.create_task(modulo_rele.principal(CLAVE, puerto, listo))
+        await asyncio.wait_for(listo.wait(), 5)
+        url = f"ws://127.0.0.1:{puerto}"
     nodos = [Nodo(url, CLAVE, "pruebas", f"n{i}", lista, {"nucleos": 1}) for i, lista in enumerate(nodos_motores)]
     vidas = [asyncio.create_task(n.vivir()) for n in nodos]
     try:
@@ -42,8 +48,11 @@ async def red(*nodos_motores: list):
     finally:
         for v in vidas:
             v.cancel()
-        servidor.cancel()
-        await asyncio.gather(*vidas, servidor, return_exceptions=True)
+        if servidor is not None:
+            servidor.cancel()
+            await asyncio.gather(*vidas, servidor, return_exceptions=True)
+        else:
+            await asyncio.gather(*vidas, return_exceptions=True)
 
 
 class Lento:
@@ -168,7 +177,8 @@ def test_ritmo_corta_a_quien_inunda(monkeypatch):
             async with connect(url) as ws:
                 await ws.send(json.dumps({"t": "hola", "clave": CLAVE, "enjambre": "pruebas", "rol": "cliente"}))
                 await ws.recv()
-                for _ in range(20):
+                repeticiones = 200 if os.environ.get("FABRIC_TEST_RELE_URL") else 20
+                for _ in range(repeticiones):
                     await ws.send(json.dumps({"t": "latido"}))
                 motivos = []
                 try:

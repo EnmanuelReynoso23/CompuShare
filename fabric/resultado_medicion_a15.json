@@ -1,0 +1,156 @@
+{
+  "fecha": "2026-11-04T15:43:08.581003+00:00",
+  "carga_inicial": {
+    "loadavg": [
+      0.99609375,
+      1.10107421875,
+      1.23779296875
+    ],
+    "top_procesos": [
+      "    PID %CPU %MEM COMMAND         COMMAND",
+      " 229616 60.0  0.1 python          /home/reyno/Proyectos/CompuShare/.venv/bin/python fabric/medir_a15.py",
+      "    120  4.8  0.0 kswapd0         [kswapd0]",
+      "   3961  2.0  0.1 Hyprland        Hyprland --watchdog-fd 4",
+      " 198510  1.7  1.2 chrome          /opt/google/chrome/chrome --type=renderer --crashpad-handler-pid=198215 --enable-crash-reporter=, --change-stack-guard-on-fork=enable --ozone-platform=wayland --lang=es --num-raster-threads=4 --enable-main-frame-before-activation --renderer-client-id=20 --launch-time-ticks=9035742591 --shared-files=v8_context_snapshot_data:100 --metrics-shmem-handle=4,i,10314504939760381011,17445764089295091781,1572864 --field-trial-handle=3,i,8259574466251686232,17253768415180641085,262144 --variations-seed-version=20261104-010032.775000-production --pseudonymization-salt-handle=7,i,14542501142797632707,4249286332855259264,4 --trace-process-track-uuid=3190709005052708474",
+      "   4064  1.4  0.4 quickshell.real /home/reyno/.local/opt/quickshell-upstream/bin/quickshell.real -c caelestia -n -d",
+      " 197292  1.3  0.8 claude          claude --dangerously-skip-permissions",
+      " 198203  0.9  0.9 chrome          /opt/google/chrome/chrome --profile-directory=Default --app-id=hnpfjngllnobngcgfapefoaidbinmjnm",
+      " 215409  0.7  1.2 agy             /home/reyno/.local/bin/agy -p Lee y cumple al pie de la letra la tarea del archivo /home/reyno/Proyectos/cs-agentes/a15.md y las reglas de /home/reyno/Proyectos/cs-agentes/REGLAS.md. Ya empezaste esta tarea antes y te cortaron: revisa git status y git diff de tu worktree y continúa desde ahí, sin rehacer lo hecho. Trabajas solo, sin nadie que responda: no termines hasta haber hecho commit del informe. --dangerously-skip-permissions --add-dir /home/reyno/Proyectos/cs-a15 --add-dir /home/reyno/Proyectos/cs-agentes --add-dir /home/reyno/.local/opt/llama.cpp --model gemini-3.8-flash-high --effort high",
+      " 199304  0.7  1.2 agy             /home/reyno/.local/bin/agy -p Lee y cumple al pie de la letra la tarea del archivo /home/reyno/Proyectos/cs-agentes/a2.md y las reglas de /home/reyno/Proyectos/cs-agentes/REGLAS.md. Ya empezaste esta tarea antes y te cortaron: revisa git status y git diff de tu worktree y continúa desde ahí, sin rehacer lo hecho. Trabajas solo, sin nadie que responda: no termines hasta haber hecho commit del informe. --dangerously-skip-permissions --add-dir /home/reyno/Proyectos/cs-a2 --add-dir /home/reyno/Proyectos/cs-agentes --add-dir /home/reyno/.local/opt/llama.cpp --model gemini-3.8-flash-high --effort high",
+      " 197130  0.6  0.1 ghostty         ghostty",
+      " 198259  0.5  0.2 chrome          /opt/google/chrome/chrome --type=gpu-process --gpu-recent-crash-count=0 --ozone-platform=wayland --render-node-override=/dev/dri/renderD128 --crashpad-handler-pid=198215 --enable-crash-reporter=, --change-stack-guard-on-fork=enable --gpu-preferences=YAAAAAAAAAAgAQAEAAAAAAAAAAAAAGAASAAAAAAAAAABAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAMAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAMAAAAAQAAAAAAAAAAAAAACAAAAAAAAAAIAAAAAAAAAA== --shared-files --metrics-shmem-handle=4,i,4742241989482397602,5996678538914440317,262144 --field-trial-handle=3,i,8259574466251686232,17253768415180641085,262144 --variations-seed-version=20261104-010032.775000-production --pseudonymization-salt-handle=7,i,14542501142797632707,4249286332855259264,4 --trace-process-track-uuid=3190708988185955192",
+      "    835  0.4  0.3 dockerd         /usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock",
+      " 215426  0.2  0.1 python          /home/reyno/.local/opt/lancedb-hub/.venv/bin/python /home/reyno/.local/opt/lancedb-hub/server_mcp.py",
+      "    100  0.2  0.0 kcompactd0      [kcompactd0]"
+    ]
+  },
+  "cpu_count": 12,
+  "modelo": "/home/reyno/.cache/fabric-descargas/modelos/Qwen3.5-0.8B-Q8_0.gguf",
+  "hilos_llama": 4,
+  "rango_puertos": "52000-52999",
+  "eco": {
+    "directo": {
+      "rtt_mediana_ms": 0.02,
+      "rtt_min_ms": 0.018,
+      "rtt_max_ms": 0.067,
+      "ancho_mb_s": 1209.06,
+      "duracion_ancho_s": 0.041
+    },
+    "tubo_rele_python": {
+      "rtt_mediana_ms": 0.081,
+      "rtt_min_ms": 0.078,
+      "rtt_max_ms": 2.535,
+      "ancho_mb_s": 750.17,
+      "duracion_ancho_s": 0.067
+    },
+    "tubo_rele_go": {
+      "rtt_mediana_ms": 0.043,
+      "rtt_min_ms": 0.038,
+      "rtt_max_ms": 0.752,
+      "ancho_mb_s": 744.59,
+      "duracion_ancho_s": 0.067
+    }
+  },
+  "llama_rpc": {
+    "directo": {
+      "nombre": "directo",
+      "rpc_target": "127.0.0.1:52300",
+      "repeticiones": 3,
+      "comando": "/home/reyno/.local/opt/llama.cpp/build/bin/llama-bench -m /home/reyno/.cache/fabric-descargas/modelos/Qwen3.5-0.8B-Q8_0.gguf -rpc 127.0.0.1:52300 -ngl 99 -p 16 -n 64 -t 4 -r 3 -o json",
+      "gen_mediana_tok_s": 34.87,
+      "gen_valores": [
+        34.87,
+        33.45,
+        34.94
+      ],
+      "prompt_mediana_tok_s": 229.27,
+      "prompt_valores": [
+        229.27,
+        233.0,
+        218.33
+      ],
+      "duracion_total_s": 6.833
+    },
+    "tubo_rele_python": {
+      "nombre": "tubo+relé Python",
+      "rpc_target": "127.0.0.1:52450",
+      "repeticiones": 3,
+      "comando": "/home/reyno/.local/opt/llama.cpp/build/bin/llama-bench -m /home/reyno/.cache/fabric-descargas/modelos/Qwen3.5-0.8B-Q8_0.gguf -rpc 127.0.0.1:52450 -ngl 99 -p 16 -n 64 -t 4 -r 3 -o json",
+      "gen_mediana_tok_s": 35.42,
+      "gen_valores": [
+        35.42,
+        34.77,
+        35.61
+      ],
+      "prompt_mediana_tok_s": 228.98,
+      "prompt_valores": [
+        228.98,
+        192.99,
+        261.32
+      ],
+      "duracion_total_s": 7.115
+    },
+    "tubo_rele_go": {
+      "nombre": "tubo+relé Go",
+      "rpc_target": "127.0.0.1:52600",
+      "repeticiones": 3,
+      "comando": "/home/reyno/.local/opt/llama.cpp/build/bin/llama-bench -m /home/reyno/.cache/fabric-descargas/modelos/Qwen3.5-0.8B-Q8_0.gguf -rpc 127.0.0.1:52600 -ngl 99 -p 16 -n 64 -t 4 -r 3 -o json",
+      "gen_mediana_tok_s": 37.94,
+      "gen_valores": [
+        34.32,
+        37.94,
+        38.18
+      ],
+      "prompt_mediana_tok_s": 230.03,
+      "prompt_valores": [
+        230.03,
+        230.26,
+        221.1
+      ],
+      "duracion_total_s": 6.645
+    },
+    "go_simulador_mismo_pais": {
+      "nombre": "Go detrás de simulador (mismo país)",
+      "rpc_target": "127.0.0.1:52800",
+      "repeticiones": 3,
+      "comando": "/home/reyno/.local/opt/llama.cpp/build/bin/llama-bench -m /home/reyno/.cache/fabric-descargas/modelos/Qwen3.5-0.8B-Q8_0.gguf -rpc 127.0.0.1:52800 -ngl 99 -p 16 -n 64 -t 4 -r 3 -o json",
+      "gen_mediana_tok_s": 3.21,
+      "gen_valores": [
+        3.2,
+        3.21,
+        3.21
+      ],
+      "prompt_mediana_tok_s": 39.01,
+      "prompt_valores": [
+        36.59,
+        39.01,
+        41.57
+      ],
+      "duracion_total_s": 197.319
+    }
+  },
+  "carga_final": {
+    "loadavg": [
+      2.2236328125,
+      1.666015625,
+      1.43994140625
+    ],
+    "top_procesos": [
+      "    PID %CPU %MEM COMMAND         COMMAND",
+      "    120  4.7  0.0 kswapd0         [kswapd0]",
+      "   3961  2.0  0.0 Hyprland        Hyprland --watchdog-fd 4",
+      " 198510  1.6  2.1 chrome          /opt/google/chrome/chrome --type=renderer --crashpad-handler-pid=198215 --enable-crash-reporter=, --change-stack-guard-on-fork=enable --ozone-platform=wayland --lang=es --num-raster-threads=4 --enable-main-frame-before-activation --renderer-client-id=20 --launch-time-ticks=9035742591 --shared-files=v8_context_snapshot_data:100 --metrics-shmem-handle=4,i,10314504939760381011,17445764089295091781,1572864 --field-trial-handle=3,i,8259574466251686232,17253768415180641085,262144 --variations-seed-version=20261104-010032.775000-production --pseudonymization-salt-handle=7,i,14542501142797632707,4249286332855259264,4 --trace-process-track-uuid=3190709005052708474",
+      " 230568  1.4  1.1 python          /home/reyno/.local/opt/lancedb-hub/.venv/bin/python /home/reyno/.local/opt/lancedb-hub/server_mcp.py",
+      "   4064  1.3  0.5 quickshell.real /home/reyno/.local/opt/quickshell-upstream/bin/quickshell.real -c caelestia -n -d",
+      " 197292  1.2  1.6 claude          claude --dangerously-skip-permissions",
+      " 230552  1.0  1.5 agy             /home/reyno/.local/bin/agy -p Lee y cumple al pie de la letra la tarea del archivo /home/reyno/Proyectos/cs-agentes/a7.md y las reglas de /home/reyno/Proyectos/cs-agentes/REGLAS.md. Ya empezaste esta tarea antes y te cortaron: revisa git status y git diff de tu worktree y continúa desde ahí, sin rehacer lo hecho. Trabajas solo, sin nadie que responda: no termines hasta haber hecho commit del informe. --dangerously-skip-permissions --add-dir /home/reyno/Proyectos/cs-a7 --add-dir /home/reyno/Proyectos/cs-agentes --add-dir /home/reyno/.local/opt/llama.cpp --model gemini-3.8-flash-high --effort high",
+      " 198203  0.9  1.1 chrome          /opt/google/chrome/chrome --profile-directory=Default --app-id=hnpfjngllnobngcgfapefoaidbinmjnm",
+      " 215409  0.6  0.8 agy             /home/reyno/.local/bin/agy -p Lee y cumple al pie de la letra la tarea del archivo /home/reyno/Proyectos/cs-agentes/a15.md y las reglas de /home/reyno/Proyectos/cs-agentes/REGLAS.md. Ya empezaste esta tarea antes y te cortaron: revisa git status y git diff de tu worktree y continúa desde ahí, sin rehacer lo hecho. Trabajas solo, sin nadie que responda: no termines hasta haber hecho commit del informe. --dangerously-skip-permissions --add-dir /home/reyno/Proyectos/cs-a15 --add-dir /home/reyno/Proyectos/cs-agentes --add-dir /home/reyno/.local/opt/llama.cpp --model gemini-3.8-flash-high --effort high",
+      " 197130  0.6  0.1 ghostty         ghostty",
+      " 198259  0.5  0.2 chrome          /opt/google/chrome/chrome --type=gpu-process --gpu-recent-crash-count=0 --ozone-platform=wayland --render-node-override=/dev/dri/renderD128 --crashpad-handler-pid=198215 --enable-crash-reporter=, --change-stack-guard-on-fork=enable --gpu-preferences=YAAAAAAAAAAgAQAEAAAAAAAAAAAAAGAASAAAAAAAAAABAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAMAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAMAAAAAQAAAAAAAAAAAAAACAAAAAAAAAAIAAAAAAAAAA== --shared-files --metrics-shmem-handle=4,i,4742241989482397602,5996678538914440317,262144 --field-trial-handle=3,i,8259574466251686232,17253768415180641085,262144 --variations-seed-version=20261104-010032.775000-production --pseudonymization-salt-handle=7,i,14542501142797632707,4249286332855259264,4 --trace-process-track-uuid=3190708988185955192",
+      " 230665  0.5  0.9 node-MainThread node /home/reyno/.npm/_npx/68d9b3040972c2bf/node_modules/.bin/google-drive-mcp",
+      "    835  0.4  0.3 dockerd         /usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock",
+      " 232391  0.3  0.8 chrome          /opt/google/chrome/chrome --type=renderer --crashpad-handler-pid=198215 --enable-crash-reporter=, --change-stack-guard-on-fork=enable --ozone-platform=wayland --lang=es --num-raster-threads=4 --enable-main-frame-before-activation --renderer-client-id=49 --launch-time-ticks=10855181826 --shared-files=v8_context_snapshot_data:100 --metrics-shmem-handle=4,i,11265885091725035144,7816717758218197149,1572864 --field-trial-handle=3,i,8259574466251686232,17253768415180641085,262144 --variations-seed-version=20261104-010032.775000-production --pseudonymization-salt-handle=7,i,14542501142797632707,4249286332855259264,4 --trace-process-track-uuid=3190709032226922095"
+    ]
+  }
+}
