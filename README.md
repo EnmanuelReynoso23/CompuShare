@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://github.com/EnmanuelReynoso23/CompuShare/blob/main/LICENSE"><img src="https://img.shields.io/badge/Licencia-MIT-green.svg" alt="Licencia MIT" /></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.10%2B-blue.svg?logo=python&logoColor=white" alt="Python 3.10+" /></a>
-  <a href="https://enmanuelreynoso23.github.io/CompuShare/"><img src="https://img.shields.io/badge/Sitio%20Web-Documentaci%C3%B3n%20en%20Vivo-purple.svg?logo=googlechrome&logoColor=white" alt="Sitio Web" /></a>
+  <a href="https://enmanuelreynoso23.github.io/CompuShare/"><img src="https://img.shields.io/badge/Sitio%20Web-Documentaci%C3%B3n-purple.svg" alt="Sitio Web" /></a>
   <img src="https://img.shields.io/badge/Pruebas-42%20pasadas-success.svg?logo=pytest&logoColor=white" alt="42 tests pasados" />
   <img src="https://img.shields.io/badge/API-OpenAI%20Compatible-black.svg?logo=openai&logoColor=white" alt="OpenAI Compatible" />
   <img src="https://img.shields.io/badge/Hardware-CUDA%20%2F%20CPU-orange.svg?logo=nvidia&logoColor=white" alt="CUDA / CPU" />
@@ -24,7 +24,7 @@
 
 ---
 
-## 💡 Manifiesto y Visión
+## Manifiesto y Visión
 
 Hoy en día, el acceso a los modelos de inteligencia artificial más potentes está hipercentralizado. Dependemos de un puñado de corporaciones que controlan los centros de datos y cobran por cada token generado.
 
@@ -38,7 +38,7 @@ De la misma forma que BitTorrent descentralizó el almacenamiento y Folding@home
 
 ---
 
-## 🏛️ Arquitectura General
+## Arquitectura General
 
 ```mermaid
 flowchart TD
@@ -74,7 +74,7 @@ flowchart TD
 
 ---
 
-## 🚀 Hoja de Ruta y Estado del Proyecto
+## Hoja de Ruta y Estado del Proyecto
 
 - [x] **Fase 0 (Prototipo validado):** Pruebas de concepto iniciales en Kaggle con nodos maestro, trabajador, relé WebSocket y modelos Qwen vía `llama.cpp`.
 - [x] **Fase 1 (Desacoplamiento e Infraestructura Core):** Protocolo WebSocket con streaming token a token, Relé Maestro con endpoint OpenAI `/v1/chat/completions` (SSE), Nodo Trabajador y scripts de despliegue para Kaggle.
@@ -83,13 +83,13 @@ flowchart TD
 - [ ] **Fase 4 (CLI Universal):** `compushare join` para donar cómputo en 1 línea y `compushare serve` para levantar el endpoint local.
 
 Documentación técnica y planes detallados:
-- 📋 [PLAN.md](PLAN.md) — Plan de trabajo integral y estado de agentes.
-- 📐 [docs/MATEMATICA.md](docs/MATEMATICA.md) — Calibración de latencias, fórmulas de rendimiento y throughput medido.
-- 📊 [docs/ESTADO-Y-PENDIENTES.md](docs/ESTADO-Y-PENDIENTES.md) — Estado actual y tareas pendientes.
+- [PLAN.md](PLAN.md) — Plan de trabajo integral y estado de agentes.
+- [docs/MATEMATICA.md](docs/MATEMATICA.md) — Calibración de latencias, fórmulas de rendimiento y throughput medido.
+- [docs/ESTADO-Y-PENDIENTES.md](docs/ESTADO-Y-PENDIENTES.md) — Estado actual y tareas pendientes.
 
 ---
 
-## ⚡ Guía de Inicio Rápido (CLI)
+## Guía de Inicio Rápido (CLI)
 
 ### Instalación
 
@@ -109,11 +109,11 @@ uv pip install -e .
 compushare servir --puerto 8000
 ```
 
-Esto levanta de forma inmediata:
-- **Dashboard web en tiempo real:** `http://localhost:8000/`
-- **Endpoint compatible con OpenAI:** `http://localhost:8000/v1/chat/completions`
-- **Catálogo de modelos disponibles:** `http://localhost:8000/v1/models`
-- **Canal WebSocket para trabajadores:** `ws://localhost:8000/ws/worker`
+Esto levanta:
+- Dashboard web en tiempo real: `http://localhost:8000/`
+- Endpoint compatible con OpenAI: `http://localhost:8000/v1/chat/completions`
+- Catálogo de modelos disponibles: `http://localhost:8000/v1/models`
+- Canal WebSocket para trabajadores: `ws://localhost:8000/ws/worker`
 
 ### 2. Conectar un Nodo Trabajador al Enjambre
 
@@ -128,12 +128,12 @@ compushare unirse --rele ws://127.0.0.1:8000/ws/worker --modelo qwen2.5-coder --
 ### 3. Probar la Inferencia Distribuida
 
 ```bash
-compushare probar --url http://127.0.0.1:8000 --modelo qwen2.5-coder --prompt "¿Cómo funciona CompuShare?"
+compushare probar --url http://127.0.0.1:8000 --modelo qwen2.5-coder --prompt "Escribe un merge sort en Python"
 ```
 
 ---
 
-## 🔌 Uso con Clientes de IA (Cursor, Antigravity, Python)
+## Uso con Clientes de IA (Cursor, Antigravity, Python)
 
 Al ser 100 % compatible con el estándar de OpenAI, puedes configurar CompuShare en cualquier cliente:
 
@@ -158,9 +158,9 @@ for chunk in response:
 
 ---
 
-## ☁️ Despliegue en Kaggle y Google Colab
+## Despliegue en Kaggle y Google Colab
 
-Puedes donar las GPUs gratuitas de Kaggle (2x NVIDIA Tesla T4) al enjambre ejecutando el script automatizado:
+Puedes donar las GPUs de Kaggle (2x NVIDIA Tesla T4) al enjambre ejecutando el script automatizado:
 
 ```python
 # En una celda de Kaggle con GPU T4 x 2 e Internet habilitado:
@@ -173,7 +173,7 @@ El script se encarga de descargar `llama-server` optimizado para CUDA, el modelo
 
 ---
 
-## 📂 Estructura del Repositorio
+## Estructura del Repositorio
 
 ```text
 compushare/
@@ -198,7 +198,7 @@ compushare/
 
 ---
 
-## 🛠️ Tecnologías y Lenguajes
+## Tecnologías y Lenguajes
 
 | Lenguaje / Tecnología | Rol en CompuShare | Archivos / Líneas |
 | :--- | :--- | :---: |
@@ -210,6 +210,6 @@ compushare/
 
 ---
 
-## 📄 Licencia
+## Licencia
 
 Este proyecto está bajo la licencia de código abierto **MIT** - consulta el archivo [LICENSE](LICENSE) para más detalles.

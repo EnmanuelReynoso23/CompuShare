@@ -1,8 +1,0 @@
-[Wed Nov 04 17:30:00.000000 20] [mpm_event:notice] [pid 1024:tid 1] AH00489: Apache/2.4.62 (Unix) OpenSSL/3.2.1 configured -- resuming normal operations
-[Wed Nov 04 17:30:00.000000 20] [core:notice] [pid 1024:tid 1] AH00094: Command line: '/usr/sbin/httpd -D FOREGROUND'
-[Wed Nov 04 17:30:00.000000 20] [compushare:notice] [pid 1025:tid 4] CompuShare Swarm Relay online on port 8000. Listening for 4 worker laptops...
-[Wed Nov 04 17:30:01.420406 20] [compushare:info] [pid 1025:tid 5] Node connected: laptop-01-alfa from 192.168.1.101 | Hardware: Lenovo ThinkPad X1 (Intel Core Ultra + NPU) | Latency RTT: 50.2ms
-[Wed Nov 04 17:30:00.559303 20] [compushare:info] [pid 1025:tid 5] Node connected: laptop-02-beta from 192.168.1.102 | Hardware: Dell XPS 15 (NVIDIA RTX 4060 Laptop GPU) | Latency RTT: 50.2ms
-[Wed Nov 04 17:30:01.500848 20] [compushare:info] [pid 1025:tid 5] Node connected: laptop-03-gamma from 192.168.1.103 | Hardware: Apple MacBook Pro (Apple Silicon M3 Max) | Latency RTT: 50.2ms
-[Wed Nov 04 17:30:01.330712 20] [compushare:info] [pid 1025:tid 5] Node connected: laptop-04-delta from 192.168.1.104 | Hardware: Asus ROG Zephyrus (AMD Ryzen 9 + RTX 4070) | Latency RTT: 50.2ms
-[Wed Nov 04 17:52:06.757513 20] [compushare:notice] [pid 1025:tid 4] Swarm task finished: Entire Bible successfully transcribed in 1326.8 seconds (22.11 minutes) across 4 laptops.
