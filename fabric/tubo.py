@@ -70,6 +70,12 @@ class Tubo:
                 m = json.loads(crudo)
                 if m.get("t") == "abre":
                     asyncio.create_task(self._unir(url, str(m["id"])))
+                elif os.environ.get("FABRIC_PERFIL") == "1" and m.get("t") == "perfil_fase":
+                    from fabric import perfil_contador
+                    if m.get("accion") == "iniciar":
+                        perfil_contador.iniciar_fase_global(m["nombre"])
+                    elif m.get("accion") == "terminar":
+                        perfil_contador.terminar_fase_global(m["nombre"])
 
     async def _unir(self, url: str, ident: str) -> None:
         try:
@@ -89,6 +95,11 @@ class Tubo:
 
 
 async def canalizar(ws: Any, lector: asyncio.StreamReader, escritor: asyncio.StreamWriter, cuenta: Any = None) -> None:
+    if os.environ.get("FABRIC_PERFIL") == "1":
+        from fabric.perfil_contador import canalizar_instrumentado
+        await canalizar_instrumentado(ws, lector, escritor, TROZO, "tubo", cuenta)
+        return
+
     async def hacia_ws() -> None:
         while trozo := await lector.read(TROZO):
             if cuenta is not None:

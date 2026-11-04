@@ -472,6 +472,11 @@ class Rele:
             terminado.set()
 
     async def canalizar(self, ws: Any, lector: asyncio.StreamReader, escritor: asyncio.StreamWriter) -> None:
+        if os.environ.get("FABRIC_PERFIL") == "1":
+            from fabric.perfil_contador import canalizar_instrumentado
+            await canalizar_instrumentado(ws, lector, escritor, TUBO_TROZO, "rele", self)
+            return
+
         async def hacia_ws() -> None:
             while trozo := await lector.read(TUBO_TROZO):
                 self.tubo_bytes += len(trozo)
@@ -513,7 +518,27 @@ class Rele:
                     await par.ws.close(1001, "sin latido")
 
     def salud(self, conexion: ServerConnection, pedido: Request) -> Response | None:
-        if pedido.path.split("?")[0] != "/salud":
+        ruta = pedido.path.split("?")[0]
+        if os.environ.get("FABRIC_PERFIL") == "1" and ruta.startswith("/perfil/"):
+            from fabric import perfil_contador
+            partes = ruta.strip("/").split("/")
+            if len(partes) >= 3 and partes[1] == "fase_iniciar":
+                perfil_contador.iniciar_fase_global(partes[2])
+                for o in self.ofertas.values():
+                    asyncio.create_task(o.control.send(json.dumps({"t": "perfil_fase", "accion": "iniciar", "nombre": partes[2]})))
+                cuerpo = json.dumps({"ok": True, "fase_iniciada": partes[2]}).encode()
+            elif len(partes) >= 3 and partes[1] == "fase_terminar":
+                res = perfil_contador.terminar_fase_global(partes[2])
+                for o in self.ofertas.values():
+                    asyncio.create_task(o.control.send(json.dumps({"t": "perfil_fase", "accion": "terminar", "nombre": partes[2]})))
+                cuerpo = json.dumps({"ok": True, "fase_terminada": partes[2], "deltas": res}).encode()
+            else:
+                cuerpo = b'{"ok": false, "error": "comando perfil desconocido"}'
+            cabeceras = Headers([("Content-Type", "application/json"), ("Content-Length", str(len(cuerpo))),
+                                 ("Access-Control-Allow-Origin", "*")])
+            return Response(HTTPStatus.OK.value, "OK", cabeceras, cuerpo)
+
+        if ruta != "/salud":
             return None
         cuerpo = json.dumps(self.resumen()).encode()
         # Abierto a cualquier origen: la web (Vercel) lo consulta para saber si este relé sigue vivo.

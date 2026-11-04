@@ -1,0 +1,513 @@
+{
+  "ok": true,
+  "fase_terminada": "spy256",
+  "deltas": [
+    {
+      "nombre": "spy256",
+      "duracion_s": 4.5074,
+      "tcp_hacia_ws": {
+        "lecturas_tcp": 0,
+        "bytes_leidos": 0,
+        "tiempo_espera_lectura_s": 0.0,
+        "envios_ws": 0,
+        "tiempo_espera_envio_ws_s": 0.0,
+        "distribucion_tamanos": {
+          "count": 0,
+          "sum": 0,
+          "min": 0,
+          "max": 0,
+          "avg": 0,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "ws_hacia_tcp": {
+        "recepciones_ws": 0,
+        "bytes_recibidos": 0,
+        "tiempo_espera_recepcion_ws_s": 0.0,
+        "escrituras_tcp": 0,
+        "drains_tcp": 0,
+        "tiempo_espera_drain_s": 0.0,
+        "distribucion_tamanos": {
+          "count": 0,
+          "sum": 0,
+          "min": 0,
+          "max": 0,
+          "avg": 0,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "rpc_comandos": {},
+      "etiqueta": "rele"
+    },
+    {
+      "nombre": "spy256",
+      "duracion_s": 4.5074,
+      "tcp_hacia_ws": {
+        "lecturas_tcp": 0,
+        "bytes_leidos": 0,
+        "tiempo_espera_lectura_s": 0.0,
+        "envios_ws": 0,
+        "tiempo_espera_envio_ws_s": 0.0,
+        "distribucion_tamanos": {
+          "count": 0,
+          "sum": 0,
+          "min": 0,
+          "max": 0,
+          "avg": 0,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "ws_hacia_tcp": {
+        "recepciones_ws": 0,
+        "bytes_recibidos": 0,
+        "tiempo_espera_recepcion_ws_s": 0.0,
+        "escrituras_tcp": 0,
+        "drains_tcp": 0,
+        "tiempo_espera_drain_s": 0.0,
+        "distribucion_tamanos": {
+          "count": 0,
+          "sum": 0,
+          "min": 0,
+          "max": 0,
+          "avg": 0,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "rpc_comandos": {},
+      "etiqueta": "rele"
+    },
+    {
+      "nombre": "spy256",
+      "duracion_s": 4.5074,
+      "tcp_hacia_ws": {
+        "lecturas_tcp": 0,
+        "bytes_leidos": 0,
+        "tiempo_espera_lectura_s": 0.0,
+        "envios_ws": 0,
+        "tiempo_espera_envio_ws_s": 0.0,
+        "distribucion_tamanos": {
+          "count": 0,
+          "sum": 0,
+          "min": 0,
+          "max": 0,
+          "avg": 0,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "ws_hacia_tcp": {
+        "recepciones_ws": 0,
+        "bytes_recibidos": 0,
+        "tiempo_espera_recepcion_ws_s": 0.0,
+        "escrituras_tcp": 0,
+        "drains_tcp": 0,
+        "tiempo_espera_drain_s": 0.0,
+        "distribucion_tamanos": {
+          "count": 0,
+          "sum": 0,
+          "min": 0,
+          "max": 0,
+          "avg": 0,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "rpc_comandos": {},
+      "etiqueta": "rele"
+    },
+    {
+      "nombre": "spy256",
+      "duracion_s": 4.5074,
+      "tcp_hacia_ws": {
+        "lecturas_tcp": 0,
+        "bytes_leidos": 0,
+        "tiempo_espera_lectura_s": 0.0,
+        "envios_ws": 0,
+        "tiempo_espera_envio_ws_s": 0.0,
+        "distribucion_tamanos": {
+          "count": 0,
+          "sum": 0,
+          "min": 0,
+          "max": 0,
+          "avg": 0,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "ws_hacia_tcp": {
+        "recepciones_ws": 0,
+        "bytes_recibidos": 0,
+        "tiempo_espera_recepcion_ws_s": 0.0,
+        "escrituras_tcp": 0,
+        "drains_tcp": 0,
+        "tiempo_espera_drain_s": 0.0,
+        "distribucion_tamanos": {
+          "count": 0,
+          "sum": 0,
+          "min": 0,
+          "max": 0,
+          "avg": 0,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "rpc_comandos": {},
+      "etiqueta": "rele"
+    },
+    {
+      "nombre": "spy256",
+      "duracion_s": 4.5074,
+      "tcp_hacia_ws": {
+        "lecturas_tcp": 0,
+        "bytes_leidos": 0,
+        "tiempo_espera_lectura_s": 0.0,
+        "envios_ws": 0,
+        "tiempo_espera_envio_ws_s": 0.0,
+        "distribucion_tamanos": {
+          "count": 0,
+          "sum": 0,
+          "min": 0,
+          "max": 0,
+          "avg": 0,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "ws_hacia_tcp": {
+        "recepciones_ws": 0,
+        "bytes_recibidos": 0,
+        "tiempo_espera_recepcion_ws_s": 0.0,
+        "escrituras_tcp": 0,
+        "drains_tcp": 0,
+        "tiempo_espera_drain_s": 0.0,
+        "distribucion_tamanos": {
+          "count": 0,
+          "sum": 0,
+          "min": 0,
+          "max": 0,
+          "avg": 0,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "rpc_comandos": {},
+      "etiqueta": "rele"
+    },
+    {
+      "nombre": "spy256",
+      "duracion_s": 4.5074,
+      "tcp_hacia_ws": {
+        "lecturas_tcp": 0,
+        "bytes_leidos": 0,
+        "tiempo_espera_lectura_s": 0.0,
+        "envios_ws": 0,
+        "tiempo_espera_envio_ws_s": 0.0,
+        "distribucion_tamanos": {
+          "count": 0,
+          "sum": 0,
+          "min": 0,
+          "max": 0,
+          "avg": 0,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "ws_hacia_tcp": {
+        "recepciones_ws": 0,
+        "bytes_recibidos": 0,
+        "tiempo_espera_recepcion_ws_s": 0.0,
+        "escrituras_tcp": 0,
+        "drains_tcp": 0,
+        "tiempo_espera_drain_s": 0.0,
+        "distribucion_tamanos": {
+          "count": 0,
+          "sum": 0,
+          "min": 0,
+          "max": 0,
+          "avg": 0,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "rpc_comandos": {},
+      "etiqueta": "rele"
+    },
+    {
+      "nombre": "spy256",
+      "duracion_s": 4.5074,
+      "tcp_hacia_ws": {
+        "lecturas_tcp": 0,
+        "bytes_leidos": 0,
+        "tiempo_espera_lectura_s": 0.0,
+        "envios_ws": 0,
+        "tiempo_espera_envio_ws_s": 0.0,
+        "distribucion_tamanos": {
+          "count": 0,
+          "sum": 0,
+          "min": 0,
+          "max": 0,
+          "avg": 0,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "ws_hacia_tcp": {
+        "recepciones_ws": 0,
+        "bytes_recibidos": 0,
+        "tiempo_espera_recepcion_ws_s": 0.0,
+        "escrituras_tcp": 0,
+        "drains_tcp": 0,
+        "tiempo_espera_drain_s": 0.0,
+        "distribucion_tamanos": {
+          "count": 0,
+          "sum": 0,
+          "min": 0,
+          "max": 0,
+          "avg": 0,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "rpc_comandos": {},
+      "etiqueta": "rele"
+    },
+    {
+      "nombre": "spy256",
+      "duracion_s": 4.5074,
+      "tcp_hacia_ws": {
+        "lecturas_tcp": 0,
+        "bytes_leidos": 0,
+        "tiempo_espera_lectura_s": 0.0,
+        "envios_ws": 0,
+        "tiempo_espera_envio_ws_s": 0.0,
+        "distribucion_tamanos": {
+          "count": 0,
+          "sum": 0,
+          "min": 0,
+          "max": 0,
+          "avg": 0,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "ws_hacia_tcp": {
+        "recepciones_ws": 0,
+        "bytes_recibidos": 0,
+        "tiempo_espera_recepcion_ws_s": 0.0,
+        "escrituras_tcp": 0,
+        "drains_tcp": 0,
+        "tiempo_espera_drain_s": 0.0,
+        "distribucion_tamanos": {
+          "count": 0,
+          "sum": 0,
+          "min": 0,
+          "max": 0,
+          "avg": 0,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "rpc_comandos": {},
+      "etiqueta": "rele"
+    },
+    {
+      "nombre": "spy256",
+      "duracion_s": 4.5074,
+      "tcp_hacia_ws": {
+        "lecturas_tcp": 0,
+        "bytes_leidos": 0,
+        "tiempo_espera_lectura_s": 0.0,
+        "envios_ws": 0,
+        "tiempo_espera_envio_ws_s": 0.0,
+        "distribucion_tamanos": {
+          "count": 0,
+          "sum": 0,
+          "min": 0,
+          "max": 0,
+          "avg": 0,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "ws_hacia_tcp": {
+        "recepciones_ws": 0,
+        "bytes_recibidos": 0,
+        "tiempo_espera_recepcion_ws_s": 0.0,
+        "escrituras_tcp": 0,
+        "drains_tcp": 0,
+        "tiempo_espera_drain_s": 0.0,
+        "distribucion_tamanos": {
+          "count": 0,
+          "sum": 0,
+          "min": 0,
+          "max": 0,
+          "avg": 0,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "rpc_comandos": {},
+      "etiqueta": "rele"
+    },
+    {
+      "nombre": "spy256",
+      "duracion_s": 4.5074,
+      "tcp_hacia_ws": {
+        "lecturas_tcp": 0,
+        "bytes_leidos": 0,
+        "tiempo_espera_lectura_s": 0.0,
+        "envios_ws": 0,
+        "tiempo_espera_envio_ws_s": 0.0,
+        "distribucion_tamanos": {
+          "count": 0,
+          "sum": 0,
+          "min": 0,
+          "max": 0,
+          "avg": 0,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "ws_hacia_tcp": {
+        "recepciones_ws": 0,
+        "bytes_recibidos": 0,
+        "tiempo_espera_recepcion_ws_s": 0.0,
+        "escrituras_tcp": 0,
+        "drains_tcp": 0,
+        "tiempo_espera_drain_s": 0.0,
+        "distribucion_tamanos": {
+          "count": 0,
+          "sum": 0,
+          "min": 0,
+          "max": 0,
+          "avg": 0,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "rpc_comandos": {},
+      "etiqueta": "rele"
+    },
+    {
+      "nombre": "spy256",
+      "duracion_s": 4.5074,
+      "tcp_hacia_ws": {
+        "lecturas_tcp": 0,
+        "bytes_leidos": 0,
+        "tiempo_espera_lectura_s": 0.0,
+        "envios_ws": 0,
+        "tiempo_espera_envio_ws_s": 0.0,
+        "distribucion_tamanos": {
+          "count": 0,
+          "sum": 0,
+          "min": 0,
+          "max": 0,
+          "avg": 0,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "ws_hacia_tcp": {
+        "recepciones_ws": 0,
+        "bytes_recibidos": 0,
+        "tiempo_espera_recepcion_ws_s": 0.0,
+        "escrituras_tcp": 0,
+        "drains_tcp": 0,
+        "tiempo_espera_drain_s": 0.0,
+        "distribucion_tamanos": {
+          "count": 0,
+          "sum": 0,
+          "min": 0,
+          "max": 0,
+          "avg": 0,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "rpc_comandos": {},
+      "etiqueta": "rele"
+    },
+    {
+      "nombre": "spy256",
+      "duracion_s": 4.5074,
+      "tcp_hacia_ws": {
+        "lecturas_tcp": 0,
+        "bytes_leidos": 0,
+        "tiempo_espera_lectura_s": 0.0,
+        "envios_ws": 0,
+        "tiempo_espera_envio_ws_s": 0.0,
+        "distribucion_tamanos": {
+          "count": 0,
+          "sum": 0,
+          "min": 0,
+          "max": 0,
+          "avg": 0,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "ws_hacia_tcp": {
+        "recepciones_ws": 0,
+        "bytes_recibidos": 0,
+        "tiempo_espera_recepcion_ws_s": 0.0,
+        "escrituras_tcp": 0,
+        "drains_tcp": 0,
+        "tiempo_espera_drain_s": 0.0,
+        "distribucion_tamanos": {
+          "count": 0,
+          "sum": 0,
+          "min": 0,
+          "max": 0,
+          "avg": 0,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "rpc_comandos": {},
+      "etiqueta": "rele"
+    },
+    {
+      "nombre": "spy256",
+      "duracion_s": 4.5074,
+      "tcp_hacia_ws": {
+        "lecturas_tcp": 1074,
+        "bytes_leidos": 2794122,
+        "tiempo_espera_lectura_s": 5.5624,
+        "envios_ws": 1074,
+        "tiempo_espera_envio_ws_s": 0.011,
+        "distribucion_tamanos": {
+          "count": 1074,
+          "sum": 2794122,
+          "min": 1,
+          "max": 262144,
+          "avg": 2601.6,
+          "p50": 330,
+          "p95": 9142
+        }
+      },
+      "ws_hacia_tcp": {
+        "recepciones_ws": 573,
+        "bytes_recibidos": 128134152,
+        "tiempo_espera_recepcion_ws_s": 5.4915,
+        "escrituras_tcp": 573,
+        "drains_tcp": 573,
+        "tiempo_espera_drain_s": 0.0008,
+        "distribucion_tamanos": {
+          "count": 573,
+          "sum": 128134152,
+          "min": 8,
+          "max": 262144,
+          "avg": 223619.8,
+          "p50": 262144,
+          "p95": 262144
+        }
+      },
+      "rpc_comandos": {},
+      "etiqueta": "rele"
+    }
+  ]
+}
