@@ -12,6 +12,7 @@
 <p align="center">
   <a href="https://github.com/EnmanuelReynoso23/CompuShare/blob/main/LICENSE"><img src="https://img.shields.io/badge/Licencia-MIT-green.svg" alt="Licencia MIT" /></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.10%2B-blue.svg?logo=python&logoColor=white" alt="Python 3.10+" /></a>
+  <a href="https://enmanuelreynoso23.github.io/CompuShare/"><img src="https://img.shields.io/badge/Sitio%20Web-Documentaci%C3%B3n%20en%20Vivo-purple.svg?logo=googlechrome&logoColor=white" alt="Sitio Web" /></a>
   <img src="https://img.shields.io/badge/Pruebas-42%20pasadas-success.svg?logo=pytest&logoColor=white" alt="42 tests pasados" />
   <img src="https://img.shields.io/badge/API-OpenAI%20Compatible-black.svg?logo=openai&logoColor=white" alt="OpenAI Compatible" />
   <img src="https://img.shields.io/badge/Hardware-CUDA%20%2F%20CPU-orange.svg?logo=nvidia&logoColor=white" alt="CUDA / CPU" />
