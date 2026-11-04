@@ -58,6 +58,11 @@ def bytes_activacion(m: Modelo, bytes_por_valor: int = 4) -> float:
     return 2 * m.d_modelo * bytes_por_valor
 
 
+def bytes_activacion_unidireccional(m: Modelo, bytes_por_valor: int = 4) -> float:
+    """En pipeline o anillo la activación cruza cada enlace en un solo sentido hacia el siguiente nodo."""
+    return m.d_modelo * bytes_por_valor
+
+
 def memoria_necesaria_gb(m: Modelo, contexto: int = 4096, flujos: int = 1, extra: float = 0.10) -> float:
     """Pesos + caché KV de todos los flujos + un 10 % de búferes de cálculo."""
     kv = m.kv_kb_por_token * KB * contexto * flujos / GB
@@ -126,6 +131,88 @@ def tiempo_por_palabra(
         b = max(fijo, 0) + act * flujos
         ms_red += e.rtt_ms + 1000 * b * 8 / (e.subida_mbps * 1e6)
     return Resultado([e.nombre for e in equipos], capas, ms_calc, ms_red, flujos)
+
+
+def tiempo_pipelining(
+    m: Modelo,
+    maestro: Equipo,
+    trabajadores: list[Equipo],
+    bytes_por_palabra: float | None = None,
+    flujos: int = 1,
+    contexto: int = 4096,
+    eficiencia: float = EFICIENCIA_GPU,
+) -> Resultado:
+    """Pipelining real en cadena/anillo (Petals, prima.cpp PRP, BloomBee).
+
+    Varios flujos en vuelo a la vez en distintas etapas del pipeline. Cada equipo procesa
+    un flujo distinto en paralelo.
+
+    Fórmula matemática:
+      - Tiempo de servicio de la etapa i por palabra de un flujo:
+            t_etapa_i = t_calc_i + t_red_i
+      - Cuello de botella del pipeline (etapa más lenta):
+            t_cuello = max(t_etapa_i)
+      - Latencia de punta a punta de un token:
+            t_latencia = sum(t_etapa_i)
+      - Rendimiento total (palabras/s):
+            R_total = min(flujos * 1000 / t_latencia, 1000 / t_cuello)
+      - Latencia efectiva por palabra de cada flujo:
+            t_por_palabra_flujo = max(t_latencia, flujos * t_cuello)
+
+    En un pipeline unidireccional la activación cruza cada enlace una sola vez hacia el nodo siguiente.
+    """
+    equipos = [maestro, *trabajadores]
+    capas = repartir_capas(m, equipos, memoria_necesaria_gb(m, contexto, flujos))
+    leidos_por_capa = m.pesos_gb * GB * m.activos_frac / m.capas
+
+    act_unidir = bytes_activacion_unidireccional(m)
+    fijo = (bytes_por_palabra - act_unidir) if bytes_por_palabra is not None else 0.0
+    bytes_enlace = max(fijo, 0.0) + act_unidir
+
+    ms_calc_etapas: list[float] = []
+    ms_red_etapas: list[float] = []
+    ms_tot_etapas: list[float] = []
+
+    n = len(equipos)
+    for i, (e, c) in enumerate(zip(equipos, capas)):
+        if c == 0:
+            ms_calc_etapas.append(0.0)
+            ms_red_etapas.append(0.0)
+            ms_tot_etapas.append(0.0)
+            continue
+        c_calc = 1000 * c * leidos_por_capa / (e.banda_gbs * GB * eficiencia)
+        if n == 1:
+            c_red = 0.0
+        else:
+            latencia_salto = (e.rtt_ms / 2.0) if e.rtt_ms > 0 else (trabajadores[0].rtt_ms / 2.0 if trabajadores else 0.0)
+            c_red = latencia_salto + 1000 * bytes_enlace * 8 / (e.subida_mbps * 1e6)
+
+        ms_calc_etapas.append(c_calc)
+        ms_red_etapas.append(c_red)
+        ms_tot_etapas.append(c_calc + c_red)
+
+    ms_latencia_calc = sum(ms_calc_etapas)
+    ms_latencia_red = sum(ms_red_etapas)
+    ms_latencia = ms_latencia_calc + ms_latencia_red
+    ms_cuello = max(ms_tot_etapas) if ms_tot_etapas else 0.0
+
+    ms_pasada_efectiva = max(ms_latencia, flujos * ms_cuello)
+    factor = (ms_pasada_efectiva / ms_latencia) if ms_latencia > 0 else 1.0
+
+    return Resultado(
+        [e.nombre for e in equipos],
+        capas,
+        ms_latencia_calc * factor,
+        ms_latencia_red * factor,
+        flujos,
+        palabras_por_pasada=1.0,
+        detalle={
+            "tipo": "pipelining",
+            "ms_latencia": ms_latencia,
+            "ms_cuello": ms_cuello,
+            "ms_etapas": ms_tot_etapas,
+        },
+    )
 
 
 def palabras_por_pasada(alfa: float, k: int) -> float:
