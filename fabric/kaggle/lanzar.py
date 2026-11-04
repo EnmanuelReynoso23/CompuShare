@@ -76,7 +76,7 @@ NODOS = {
         "embeber": "",
         "reordenar": "",
         "contexto": 16384,
-        "paralelo": 1,
+        "paralelo": 4,
     },
     "trabajador": {
         "rol": "trabajador",
@@ -108,11 +108,12 @@ def codigo_empaquetado() -> str:
     """Todo el código Python de fabric/ salvo pruebas, web y cuadernos (así no se olvida un módulo)."""
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz") as tar:
-        for ruta in sorted((RAIZ / "fabric").rglob("*.py")):
-            rel = ruta.relative_to(RAIZ)
-            if rel.parts[1] in ("pruebas", "web", "kaggle") or "__pycache__" in rel.parts:
-                continue
-            tar.add(ruta, arcname=str(rel))
+        for base in ("fabric", "src"):
+            for ruta in sorted((RAIZ / base).rglob("*.py")):
+                rel = ruta.relative_to(RAIZ)
+                if len(rel.parts) > 1 and rel.parts[1] in ("pruebas", "web", "kaggle") or "__pycache__" in rel.parts:
+                    continue
+                tar.add(ruta, arcname=str(rel))
     return base64.b64encode(buf.getvalue()).decode()
 
 
