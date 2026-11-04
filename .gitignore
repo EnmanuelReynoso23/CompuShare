@@ -45,7 +45,11 @@ cloudflared*.log
 credentials.json
 tokens.json
 
-# IDEs
+# Go artifacts
+go/bin/
+go/dist/
+*.exe
+
 .idea/
 .vscode/
 *.swp
