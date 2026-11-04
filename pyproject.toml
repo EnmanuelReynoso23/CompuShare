@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "compushare"
+version = "0.1.0"
+description = "CompuShare: La computadora compartida - Red distribuida de inferencia y computo para IA"
+readme = "README.md"
+authors = [{ name = "Enmanuel Reynoso" }]
+license = { text = "MIT" }
+requires-python = ">=3.10"
+dependencies = [
+    "websockets>=12.0",
+    "aiohttp>=3.9.0",
+    "pydantic>=2.0.0",
+    "rich>=13.0.0",
+    "typer>=0.9.0"
+]
+
+[project.scripts]
+compushare = "compushare.cli:app"
