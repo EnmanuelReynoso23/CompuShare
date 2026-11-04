@@ -61,6 +61,7 @@ menos amigos con `fabric/calculo.elegir_optimo`, (5) MoE repartido por capas, nu
 | F6 | Verificación de nodos | un nodo que devuelve basura se detecta en la prueba |
 | F7 | SynRAG pregunta a la red (`preguntar_red`) desde el MCP | respuesta con fuentes por la red real |
 | F8 | MoE: solo investigar y medir qué permite llama.cpp | documento con cifras, sin prometer nada |
+| F9 | Prueba final en Kaggle simulando computadoras de casas (pedida 4-nov): con A2-A16 ya juntados, Qwen3.8-27B repartido entre cuadernos (2 x T4 cada uno), metiendo entre nodos los perfiles del simulador de A1 (`misma ciudad`, `mismo país`, `otro continente`, `cloudflare medido`) | tabla tok/s por N cuadernos y perfil, con y sin especulativa y varios flujos, comparada con lo que predice `docs/MATEMATICA.md` |
 
 Todo número que se publique va a un `CLAIMS.md` de CompuShare con fecha, comando y archivo de resultado.
 
