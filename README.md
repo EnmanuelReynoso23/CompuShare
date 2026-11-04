@@ -126,6 +126,20 @@ compushare/
 
 ---
 
+## 🛠️ Tecnologías y Lenguajes del Ecosistema
+
+El proyecto **CompuShare** está construido mediante una arquitectura multicapa altamente optimizada:
+
+| Lenguaje / Tecnología | Rol en CompuShare | Archivos / Líneas |
+| :--- | :--- | :--- |
+| **Python (3.10+)** | **Motor Central, Relé y CLI:** Orquestación asíncrona (`asyncio`, `aiohttp`, `websockets`), tipado estricto con `Pydantic v2`, CLI con `Typer`/`Rich`, simulador de red TCP y suite de pruebas (`pytest`). | 47 archivos (~7.700 líneas) |
+| **TypeScript & React** | **Dashboard Web y Frontend:** Interfaz visual de monitorización del enjambre (`fabric/web/`), construida con React, Vite y Tailwind CSS. | 11 archivos (~1.450 líneas) |
+| **C / C++ & CUDA** | **Motor de Inferencia de Alto Rendimiento:** Backend de ejecución basado en `llama.cpp` y `ggml-rpc-server`, con aceleración por hardware en GPUs NVIDIA (Tesla T4, P100, RTX). | Binarios y bindings |
+| **Shell / Bash & Docker** | **Despliegue y Automatización:** Scripts para provisionamiento autónomo en entornos efímeros (Kaggle / Google Colab) y contenedorización (`Dockerfile`, `docker-compose.yml`). | 3 archivos |
+| **Markdown, TOML & JSON** | **Especificaciones Matemáticas y Configuración:** Modelado formal de latencias (`MATEMATICA.md`), informes de pruebas empíricas y manifiesto de empaquetado. | ~33 archivos |
+
+---
+
 ## Licencia
 
 Este proyecto está bajo la licencia **MIT** - consulta el archivo [LICENSE](LICENSE) para más detalles.
