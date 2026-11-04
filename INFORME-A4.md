@@ -23,18 +23,18 @@ El paso de llama.cpp RPC a traves del tubo TCP (`fabric/tubo.py`) y del rele Web
 - **Prompt A (historico 31-oct):** `"La capital de Francia es"`, `n_predict: 24`, `temperature: 0`.
 - **Prompt B (SynRAG standard):** `"Explica en tres frases que es un indice invertido."`, `n_predict: 128`, `temperature: 0`.
 - **Numero de repeticiones:** 3 repeticiones por modo, anotando cada pasada y la mediana.
-- **Herramienta de medicion:** `medir_perfil.py` (ejecuta entorno aislado, captura `/completion` y vuelca timings JSON).
+- **Herramienta de medicion:** `fabric/perfiles/a4/medir_perfil.py` (ejecuta entorno aislado, captura `/completion` y vuelca timings JSON).
 
 ### 2.2 Medicion A: Prompt historico (24 tokens)
 Comando directo:
 ```bash
-/home/reyno/Proyectos/CompuShare/.venv/bin/python /home/reyno/Proyectos/cs-a4/medir_perfil.py \
+/home/reyno/Proyectos/CompuShare/.venv/bin/python fabric/perfiles/a4/medir_perfil.py \
   --modo directo --prompt "La capital de Francia es" --n-predict 24 --temperature 0 \
   --repeticiones 3 --guardar /tmp/res_exacto_directo.json
 ```
 Comando tubo:
 ```bash
-/home/reyno/Proyectos/CompuShare/.venv/bin/python /home/reyno/Proyectos/cs-a4/medir_perfil.py \
+/home/reyno/Proyectos/CompuShare/.venv/bin/python fabric/perfiles/a4/medir_perfil.py \
   --modo tubo --prompt "La capital de Francia es" --n-predict 24 --temperature 0 \
   --repeticiones 3 --guardar /tmp/res_exacto_tubo.json
 ```
@@ -52,13 +52,13 @@ Archivos de resultado: `/tmp/res_exacto_directo.json`, `/tmp/res_exacto_tubo.jso
 ### 2.3 Medicion B: Prompt largo (128 tokens)
 Comando directo:
 ```bash
-/home/reyno/Proyectos/CompuShare/.venv/bin/python /home/reyno/Proyectos/cs-a4/medir_perfil.py \
+/home/reyno/Proyectos/CompuShare/.venv/bin/python fabric/perfiles/a4/medir_perfil.py \
   --modo directo --prompt "Explica en tres frases que es un indice invertido." \
   --n-predict 128 --repeticiones 3 --guardar /tmp/res_128_directo.json
 ```
 Comando tubo:
 ```bash
-/home/reyno/Proyectos/CompuShare/.venv/bin/python /home/reyno/Proyectos/cs-a4/medir_perfil.py \
+/home/reyno/Proyectos/CompuShare/.venv/bin/python fabric/perfiles/a4/medir_perfil.py \
   --modo tubo --prompt "Explica en tres frases que es un indice invertido." \
   --n-predict 128 --repeticiones 3 --guardar /tmp/res_128_tubo.json
 ```
@@ -148,7 +148,7 @@ Se ejecuto py-spy en modo sampling activo (-r 250 Hz, incluyendo hilos idle/io) 
 
 Comando:
 ```bash
-/home/reyno/Proyectos/CompuShare/.venv/bin/python /home/reyno/Proyectos/cs-a4/medir_perfil.py \
+/home/reyno/Proyectos/CompuShare/.venv/bin/python fabric/perfiles/a4/medir_perfil.py \
   --modo tubo --repeticiones 1 --pyspy --pyspy-dir /home/reyno/Proyectos/cs-a4
 ```
 Archivos generados: `perfil_rele.svg`, `perfil_tubo.svg`.
