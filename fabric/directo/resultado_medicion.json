@@ -1,0 +1,37 @@
+{
+  "fecha": "2026-11-04T13:42:55.635182+00:00",
+  "volumen_mb": 5.0,
+  "muestras_rtt": 20,
+  "mediciones": {
+    "tcp_directo": {
+      "canal": "tcp_directo_local",
+      "volumen_mb": 5.0,
+      "tiempo_establecimiento_ms": 0.23,
+      "tiempo_transferencia_s": 0.0075,
+      "caudal_mb_s": 662.43,
+      "rtt_medio_ms": 0.028,
+      "rtt_min_ms": 0.02,
+      "rtt_max_ms": 0.074
+    },
+    "tubo_rele": {
+      "canal": "rele_websocket_tubo",
+      "volumen_mb": 5.0,
+      "tiempo_establecimiento_ms": 1.35,
+      "tiempo_transferencia_s": 0.0153,
+      "caudal_mb_s": 326.48,
+      "rtt_medio_ms": 0.102,
+      "rtt_min_ms": 0.063,
+      "rtt_max_ms": 0.775
+    },
+    "directo_webrtc": {
+      "canal": "directo_webrtc_stun",
+      "volumen_mb": 5.0,
+      "tiempo_establecimiento_ms": 1135.34,
+      "tiempo_transferencia_s": 0.783,
+      "caudal_mb_s": 6.39,
+      "rtt_medio_ms": 0.491,
+      "rtt_min_ms": 0.423,
+      "rtt_max_ms": 0.879
+    }
+  }
+}
