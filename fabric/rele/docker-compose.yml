@@ -1,0 +1,21 @@
+# En Oracle: /opt/fabric (esta carpeta) + /opt/fabric/.env con FABRIC_CLAVE.
+# No publica puertos: el HTTPS lo pone el Caddy de la pasarela (/opt/pasarela)
+# por la red de Docker compartida `asistoya` (fabric.132-145-194-200.sslip.io).
+# Limites chicos a proposito: el servidor es de AsistoYA y esto no puede quitarle CPU.
+services:
+  fabric-rele:
+    build: .
+    env_file: .env
+    networks: [asistoya]
+    restart: unless-stopped
+    mem_limit: 160m
+    cpus: 0.5
+    pids_limit: 64
+    read_only: true
+    logging:
+      driver: json-file
+      options: { max-size: '10m', max-file: '3' }
+
+networks:
+  asistoya:
+    external: true
