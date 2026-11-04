@@ -8,9 +8,11 @@ este repo hoy es solo un esqueleto (`NodoMaestro` y `NodoTrabajador` lanzan `Not
 
 | Qué | Cifra | Fuente |
 |---|---|---|
-| Un modelo dividido en 2 cuadernos de Kaggle (4 GPU), generación | 10,3-10,8 tok/s | `fabric/kaggle/resultados/20261101-2040` |
+| Qwen3.5-9B Q8_0 dividido en 2 cuadernos de Kaggle (4 GPU), sin y con MTP | 147-150 ms por palabra; 10,3-10,8 tok/s con MTP | `fabric/kaggle/resultados/20261031-dividido` |
+| Bytes por palabra por el tubo | 315 KB (la activación sola son 32 KB) | `fabric/kaggle/resultados/20261031-dividido` |
+| Ida y vuelta mediana al relé | 101 ms (otro cuaderno: 366 ms) | `fabric/kaggle/resultados/20261101-2040` |
 | Lo mismo preguntando por la red (relé) | 6,8-6,9 tok/s | `fabric/kaggle/resultados/20261031-dividido` |
-| Ida y vuelta por el túnel de Cloudflare | 237 ms (variación 40 ms) | `fabric/PRUEBA-10.md` |
+| Ida y vuelta por el túnel de Cloudflare (HELLO, una medición) | 237 ms | `fabric/PRUEBA-10.md` |
 | Costo del relé en Python (local, CPU) | 7,1 -> 4,1 tok/s | `fabric/LEEME.md` |
 | Carga con caché de pesos en el trabajador | 7,4 s (96,6 s con compresión) | `fabric/LEEME.md` |
 
@@ -32,7 +34,14 @@ este repo hoy es solo un esqueleto (`NodoMaestro` y `NodoTrabajador` lanzan `Not
 5. **Nodos tramposos.** Un nodo puede devolver basura. Hace falta verificación (repetir al azar una parte
    en otro nodo) antes de abrirlo al público.
 
-## Decisiones que necesito del usuario
+## Prioridades según la matemática (docs/MATEMATICA.md)
+
+Modelo calibrado contra Kaggle (156 ms calculados frente a 147-150 medidos). Entre amigos, 27B Q4, 40 ms y
+10 Mb/s de subida: 2,8 palabras/s hoy; 7,2 si solo viaja la activación; ~20 con especulativa sin viajes
+extra. Orden: (1) bajar bytes por palabra, (2) especulativa sin viajes, (3) varios flujos, (4) elegir los
+menos amigos con `fabric/calculo.elegir_optimo`, (5) MoE repartido por capas, nunca por expertos.
+
+## Decisiones (respondidas el 4-nov: todas las recomendadas; Kaggle permitido)
 
 - D1. ¿CompuShare absorbe el código de `synrag-fabric/fabric` (un solo repo) o queda como CLI que lo usa?
   Recomendado: absorberlo, con historial (`git subtree`), y dejar synrag-fabric archivado.
