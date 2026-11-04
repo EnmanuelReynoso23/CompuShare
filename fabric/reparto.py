@@ -94,3 +94,18 @@ def salida_en_el_maestro(gpus_locales: int) -> list[str]:
     """
     destino = f"CUDA{gpus_locales - 1}" if gpus_locales > 0 else "CPU"
     return ["-ot", rf"(token_embd|output)\.weight={destino}"]
+
+
+def mtp_en_el_maestro(gpus_locales: int, patron_capa: str = r"blk\.24\..*") -> list[str]:
+    """Opciones de llama-server para colocar los pesos de la cabeza MTP en el maestro.
+
+    NOTA DE RENDIMIENTO: Medido empíricamente el 4-nov-2026 en la tarea A7. En llama.cpp b12024,
+    mover los pesos MTP con -ot al maestro NO reduce gamma; al contrario, lo dispara de ~0,81 a
+    ~2,29 (a k=4) y duplica el tiempo por palabra (de 410,5 ms a 946,7 ms).
+    Causa: -ot mueve solo los tensores de peso a CPU, pero dev_layer[24] y la memoria de atención
+    asociada permanecen asignados a RPC0 en el trabajador, causando transferencias cruzadas de red
+    en cada paso del draft.
+    """
+    destino = f"CUDA{gpus_locales - 1}" if gpus_locales > 0 else "CPU"
+    return ["-ot", rf"{patron_capa}={destino}"]
+

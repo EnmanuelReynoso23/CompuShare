@@ -56,3 +56,11 @@ def test_salida_en_el_maestro():
     from fabric.reparto import salida_en_el_maestro
     assert salida_en_el_maestro(0) == ["-ot", r"(token_embd|output)\.weight=CPU"]
     assert salida_en_el_maestro(2) == ["-ot", r"(token_embd|output)\.weight=CUDA1"]
+
+
+def test_mtp_en_el_maestro():
+    from fabric.reparto import mtp_en_el_maestro
+    assert mtp_en_el_maestro(0) == ["-ot", r"blk\.24\..*=CPU"]
+    assert mtp_en_el_maestro(1) == ["-ot", r"blk\.24\..*=CUDA0"]
+    assert mtp_en_el_maestro(0, patron_capa=r"blk\.32\..*") == ["-ot", r"blk\.32\..*=CPU"]
+
