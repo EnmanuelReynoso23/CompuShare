@@ -81,3 +81,16 @@ def elegir(candidatos: list[Candidato], modelo_gb: float, propio_gb: float, marg
     total = propio_gb + sum(c.vram_gb for c in vivos)
     raise ValueError(f"el modelo necesita ~{modelo_gb * margen:.1f} GB y entre todos hay {total:.1f} GB")
 
+
+
+def salida_en_el_maestro(gpus_locales: int) -> list[str]:
+    """Opciones de llama-server para que la tabla de salida (y la de entrada, que en muchos modelos es la
+    misma) quede en el maestro y nunca en un trabajador.
+
+    llama.cpp manda la capa de salida al primer equipo de la lista de capas (src/llama-model.cpp:1690):
+    si el maestro no tiene GPU, con cualquier -ngl la salida queda en el trabajador y en cada palabra
+    vuelven por la red las probabilidades de todo el vocabulario (248.320 x 4 bytes = 993 KB en Qwen3.5).
+    Medido el 4-nov-2026 en local con Qwen3.5-0.8B: lo que baja por palabra pasa de 993,3 KB a 4,1 KB.
+    """
+    destino = f"CUDA{gpus_locales - 1}" if gpus_locales > 0 else "CPU"
+    return ["-ot", rf"(token_embd|output)\.weight={destino}"]

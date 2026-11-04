@@ -336,6 +336,9 @@ if rpc:
     # capa con GET_TENSOR, cada uno espera una ida y vuelta por internet. Medido en local con 60 ms de
     # latencia: de 37-85 esperas por pregunta a 1, y la lectura del prompt de 3,3 a 15,6 tok/s.
     comando += ["--rpc", ",".join(rpc), "-ctxcp", "0", "--cache-ram", "0"]
+    # La tabla de salida en el maestro: si no, vuelve el vocabulario entero por la red en cada palabra.
+    from fabric.reparto import salida_en_el_maestro
+    comando += salida_en_el_maestro(len(gpus))
 if CONFIG.get("especulativo"):
     comando += ["--spec-type", CONFIG["especulativo"]]
 log("arrancando:", " ".join(comando[1:]))

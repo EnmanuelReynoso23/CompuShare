@@ -50,3 +50,9 @@ def test_rtt_con_hello_rpc():
     assert reparto.medir_rtt(puerto, veces=2) < 1000
     servidor.close()
     assert reparto.medir_rtt(puerto, veces=1, espera_s=1) == float("inf")
+
+
+def test_salida_en_el_maestro():
+    from fabric.reparto import salida_en_el_maestro
+    assert salida_en_el_maestro(0) == ["-ot", r"(token_embd|output)\.weight=CPU"]
+    assert salida_en_el_maestro(2) == ["-ot", r"(token_embd|output)\.weight=CUDA1"]
