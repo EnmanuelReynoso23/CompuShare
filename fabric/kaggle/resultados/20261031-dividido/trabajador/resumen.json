@@ -1,0 +1,39 @@
+{
+  "config": {
+    "rol": "trabajador",
+    "nombre": "kaggle-trabajador-1",
+    "rele": "buscar",
+    "tubo": "trabajador-1",
+    "modelo_repo": "unsloth/Qwen3.5-9B-GGUF",
+    "modelo_archivo": "Qwen3.5-9B-Q8_0.gguf",
+    "modelo_nombre": "",
+    "embeber": "",
+    "reordenar": "",
+    "contexto": 0,
+    "paralelo": 0,
+    "enjambre": "publico",
+    "duracion_min": 60,
+    "llama_cpp": "b12024",
+    "cloudflared": "2026.10.0"
+  },
+  "etapas": {
+    "codigo": 3.7,
+    "modelo": 56.9,
+    "llama_cpp": 58.1,
+    "cache_rpc": 46.5,
+    "prestando_gpu": 3900.6
+  },
+  "gpus": [
+    "Tesla T4, 15360 MiB, 7.5, 580.178.04",
+    "Tesla T4, 15360 MiB, 7.5, 580.178.04"
+  ],
+  "modelo_gb": 9.5,
+  "llama_origen": "binario oficial",
+  "cache_rpc": {
+    "tensores": 186,
+    "gb": 9.43
+  },
+  "tubo_mb": 248.2,
+  "tubo_conexiones": 30,
+  "rpc_server_vivo": true
+}

@@ -1,0 +1,46 @@
+{
+  "config": {
+    "rol": "maestro",
+    "nombre": "kaggle-qwen3.5-9b-2-equipos",
+    "rele": "aqui",
+    "tubo": "trabajador-1",
+    "espera_trabajador_min": 45,
+    "modelo_repo": "unsloth/Qwen3.5-9B-GGUF",
+    "modelo_archivo": "Qwen3.5-9B-Q8_0.gguf",
+    "modelo_nombre": "Qwen3.5-9B (2 equipos)",
+    "embeber": "",
+    "reordenar": "",
+    "contexto": 16384,
+    "paralelo": 1,
+    "enjambre": "publico",
+    "duracion_min": 55,
+    "llama_cpp": "b12024",
+    "cloudflared": "2026.10.0"
+  },
+  "etapas": {
+    "codigo": 4.0,
+    "rele": 12.9,
+    "modelo": 50.9,
+    "llama_cpp": 54.6,
+    "esperar_trabajador": 45.0,
+    "llama_server": 142.2,
+    "en_la_red": 3308.5
+  },
+  "gpus": [
+    "Tesla T4, 15360 MiB, 7.5, 580.178.04",
+    "Tesla T4, 15360 MiB, 7.5, 580.178.04"
+  ],
+  "rele_publico": "wss://drives-grades-phone-del.trycloudflare.com",
+  "modelo_gb": 9.5,
+  "llama_origen": "binario oficial",
+  "diagnostico": {
+    "llama": "binario oficial",
+    "equipos": 2,
+    "tubo_carga_mb": 42.4,
+    "local_tok_s": 6.7,
+    "local_prompt_tok_s": 0.2,
+    "tubo_kb_por_token": 315.2
+  },
+  "tareas_atendidas": 2,
+  "tareas_fallidas": 0
+}

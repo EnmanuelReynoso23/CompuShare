@@ -1,0 +1,120 @@
+# Prueba de la red en Kaggle
+
+Fecha: 2026-10-31 20:25
+
+## Nodos
+
+- **kaggle-qwen3.8-27b**: eco, embeber, generar, reordenar; 2 x Tesla T4 (31.3 GB); modelo Qwen3.8-27B
+- **kaggle-qwen3.6-35b-a3b**: eco, generar; 2 x Tesla T4 (31.3 GB); modelo Qwen3.6-35B-A3B
+
+## A. Red (ida y vuelta de una tarea vacía, relé en Oracle)
+
+- kaggle-qwen3.8-27b: mediana 124 ms, máximo 341 ms
+- kaggle-qwen3.6-35b-a3b: mediana 313 ms, máximo 2537 ms
+
+## C. Modelos
+
+- kaggle-qwen3.8-27b (Qwen3.8-27B): 5.1 tokens/s, primer token 114.85 s
+- kaggle-qwen3.6-35b-a3b (Qwen3.6-35B-A3B): 9.0 tokens/s, primer token 68.83 s
+
+### Revisiones de código delegadas (revisarlas a mano: no se dan por buenas)
+
+#### engine/mapa.py:mapa_del_repo (líneas 237-422) -- kaggle-qwen3.8-27b
+
+1. **Línea 253**: `row.get("rel_path")` falla con `AttributeError` si `filas_archivos` contiene objetos `Row` de LanceDB (que no tienen método `.get()`) en lugar de diccionarios.
+   *Caso:* Ejecutar la función con una base de datos indexada correctamente; el bucle `for row in filas_archivos` crashea al intentar acceder a las columnas.
+
+2. **Línea 296**: `resolver.Resolutor(Path(raiz_norm) if raiz_norm else Path("/"), archivos_map_norm.values())` pasa un generador (`values()`) donde probablemente se espera una lista o iterable materializable, o el constructor no acepta un generador de strings para la lista de archivos válidos.
+   *Caso:* Si `Resolutor` intenta iterar múltiples veces sobre la lista de archivos o calcular su longitud, fallará porque el generador se agota tras la primera iteración o no soporta `len()`.
+
+3. **Línea 342**: `if len(bloque_incluido) == 1 and len(bloque) > 1: break` rompe el bucle principal de archivos si el primer archivo no cabe completo, pero si el primer archivo *sí* cabe y el segundo no cabe, `bloque_incluido` tendrá 1 elemento (solo la cabecera) y se romperá, omitiendo el resto. Sin embargo, el error crítico es que si `bloque_incluido` es vacío (0 firmas caben), no se rompe, pero si solo cabe la cabecera (1 línea), se rompe. El problema real es que `break` sale del bucle `for rel in archivos_ordenados`, pero la lógica de presupuesto está mal: si el primer archivo no cabe ni la cabecera, `bloque_incluido` es vacío, no se rompe, y se continúa. Si el primer archivo cabe la cabecera pero no las firmas, se rompe. Esto es inconsistente, pero el error concreto de fallo es en la línea **339**: `candidato = "\n".join(lineas_salida + bloque_incluido + [l])`. Si `lineas_salida` es grande, esta concatenación es O(N^2) y puede ser ineficiente, pero no falla.
+   
+   *Corrección del error 3*: **Línea 305**: `definidor = abs_a_rel.get(final) if final else None`. `abs_a_rel` mapea `file_path_norm` -> `rel_path`. `final` es el resultado de `impact.destino_final`, que devuelve una ruta absoluta normalizada. Si `final` no está en `abs_a_rel` (porque el archivo destino no está en `archivos_map_norm`), `definidor` es `None`. Esto es correcto.
+   
+   *Revisando de nuevo*: El error más claro es el **1**. El segundo es el **2** (generador vs lista). El tercero: **Línea 342**: La lógica `if len(bloque_incluido) == 1 and len(bloque) > 1: break` es incorrecta. Si el primer archivo tiene 10 firmas y solo cabe la cabecera, se rompe. Pero si el primer archivo tiene 1 firma y cabe, `bloque_incluido` tiene 2 elementos, no se rompe. Si el segundo archivo tiene 10 firmas y solo cabe la cabecera, `bloque_incluido` tiene 1 elemento, se rompe. Esto es consistente.
+   
+   *Error 3 alternativo*: **Línea 253** es el principal. **Línea 296** es el segundo. **Línea 339**: `candidato = "\n".join(lineas_salida + bloque_incluido + [l])`. `lineas_salida` es una lista de strings. `bloque_incluido` es una lista de strings. `[l]` es una lista de strings. La suma de listas es correcta.
+   
+   *Error 3 real*: **Línea 305**: `abs_a_rel`
+
+#### engine/mapa.py:mapa_del_repo (líneas 237-422) -- kaggle-qwen3.6-35b-a3b
+
+Sin errores claros.
+
+#### engine/chunker.py:chunk_with_tree_sitter (líneas 330-472) -- kaggle-qwen3.8-27b
+
+1. **Línea 354**: `miembros_por_nodo` se construye usando `int(n.start_byte)` como clave, pero se consulta con `s_byte` (que es `int(n.start_byte)` en la lista `raw_nodes`). Sin embargo, si hay nodos hijos con el mismo `start_byte` (imposible en un AST válido, pero el código asume unicidad), o más críticamente, si `_miembros_de_clase` devuelve una lista vacía `[]`, la condición `if miembros:` en la línea 412 fallará para clases vacías o con miembros que no cumplan criterios, forzando a tratar la clase completa como un bloque único. El error concreto es que si una clase es grande pero `_miembros_de_clase` devuelve `[]` (por ejemplo, por un bug en esa función o si la clase solo tiene propiedades que no se consideran "miembros" en la lógica interna), el código salta al bloque `if len(chunk_text) > MAX_CHUNK_CHARS` y usa `chunk_fallback` sobre el texto completo, ignorando la estructura de miembros que debería haberse extraído. Caso: Una clase Python de 1000 líneas donde `_miembros_de_clase` devuelve `[]` debido a una implementación que solo busca métodos `def`, ignorando atributos de clase que hacen que el nodo sea grande.
+
+2. **Línea 396**: `ultimo[0]["end_line"] = linea_m + texto_m.count("\n")`. Aquí `linea_m` es la línea de inicio del miembro (`code_bytes.count(b"\n", 0, m_ini) + 1`). Si el miembro `texto_m` contiene saltos de línea, `texto_m.count("\n")` da el número de saltos, no la línea final. La línea final debería ser `linea_m + texto_m.count("\n")` solo si `linea_m` es 1-indexada y el conteo de `\n` es correcto, pero hay un error sutil: si el fragmento anterior (`ultimo[0]`) ya tenía un `end_line` calculado, y ahora se extiende hasta `m_fin`, la nueva `end_line` debe basarse en `m_fin`, no en `linea_m` del miembro actual más sus saltos. Si el miembro actual es pequeño y se pega al anterior, el `end_line` del chunk anterior se recalcula como `linea_m (del miembro pequeño) + saltos del miembro pequeño`. Esto es incorrecto si el miembro pequeño no está inmediatamente después del inicio del chunk anterior, o si hay otros miembros intermedios. Más concretamente, si `ultimo` apunta a un chunk que empezó en la línea 10, y el miembro actual empieza en la línea 50, asignar `end_line = 50 + saltos` es correcto para el final, pero la lógica asume que `ultimo[1]` (byte de inicio del último fragmento pegado) es el punto de referencia para el contenido, pero `end_line` se calcula solo con el miembro actual. Si el chunk `ultimo` contenía varios miembros pequeños, el `end_line` se sobreescribe con el del último miembro pequeño, lo cual es correcto, pero el cálculo `linea_m + texto_m.count("\n")` puede ser incorrecto si `texto_m` no termina en newline y `linea_m` es la línea de inicio. Ejemplo: Miembro en línea 10, 1 línea de longitud. `linea_m=10`, `count("\n")=0`. `end_line=10`. Correcto. Miembro en línea 10, 2 líneas. `linea_m=10`, `count("\n")=1`. `end_line=11`. Correcto. El error real es que `ultimo[0]["content"]` se reemplaza por `code_bytes[ultimo[1]:m_fin]`, pero `ultimo[1]` es el byte de inicio del *último* miembro pegado, no del inicio del chunk. Si el chunk original tenía cabecera + miembro 1, y ahora se pega miembro 2, `ultimo[1]` es el inicio del miembro 1
+
+#### engine/chunker.py:chunk_with_tree_sitter (líneas 330-472) -- kaggle-qwen3.6-35b-a3b
+
+Sin errores claros.
+
+#### engine/indexer.py:search_desktop (líneas 904-1032) -- kaggle-qwen3.8-27b
+
+1. Línea 938: `q = tbl.search(query, query_type="fts", fts_columns=columna)`
+   - **Error:** LanceDB no soporta el parámetro `fts_columns` en el método `search` para FTS (solo `query_type="fts"`). Esto lanza un `TypeError` o `ValueError` inmediato.
+   - **Caso:** Cualquier búsqueda con `use_rerank=True` (o incluso `False`) donde la tabla exista, ya que el bloque `try` principal siempre falla al intentar ejecutar esta línea.
+
+2. Línea 944: `candidates = q.limit(max(limit * 5, 25)).to_pandas().to_dict(orient="records")`
+   - **Error:** El método `to_pandas()` en LanceDB devuelve un `pandas.DataFrame`, pero si la tabla está vacía o la búsqueda no devuelve resultados, `to_pandas()` puede fallar o devolver un DataFrame vacío que no tiene columnas definidas, causando un error al intentar `.to_dict()` o más tarde al acceder a claves como `r.get("rel_path")` si el esquema no se infiere correctamente. Sin embargo, el error más crítico es que **LanceDB no tiene un método `to_pandas()` directo en el objeto de búsqueda (`q`)**; se debe usar `q.to_list()` o `q.to_arrow()`. `to_pandas()` no existe en la API pública de LanceDB para el objeto de búsqueda.
+   - **Caso:** Cualquier búsqueda que intente ejecutar la línea 944 (o la 949 en el except). El programa crashea con `AttributeError: 'Search' object has no attribute 'to_pandas'`.
+
+3. Línea 965: `reranked = ranker.rerank_snippets(query, candidatos_filtrados, top_k=limit)`
+   - **Error:** Si `candidatos_filtrados` es una lista vacía (por ejemplo, si la búsqueda FTS no devuelve nada pero `exactos` tampoco), `ranker.rerank_snippets` podría no manejar bien la lista vacía dependiendo de su implementación interna, pero el error más probable es que **`ranker.rerank_snippets` no está definido o no acepta `top_k` como parámetro** si no se importa correctamente o si la API de FlashRank es diferente. Sin embargo, asumiendo que `ranker` es un módulo válido, el error concreto es que **`candidatos_filtrados` contiene diccionarios de pandas que pueden tener `NaN` en lugar de `None`**, y si `ranker.rerank_snippets` intenta acceder a campos como `content` o `symbol_name` sin manejar `NaN`, puede fallar. Pero el error más claro es que **la línea 965 no verifica si `candidatos_filtrados` está vacío antes de llamar a `rerank_snippets`**, y si la implementación de `rerank_snippets` no maneja listas vacías, fallará.
+   - **Caso:** Búsqueda que no devuelve candidatos FTS ni exactos, pero `use_rerank=True` y `ranker.FLASHRANK_AVAILABLE=True`. Si `rerank_snippets` no maneja lista vacía, crashea.
+
+#### engine/indexer.py:search_desktop (líneas 904-1032) -- kaggle-qwen3.6-35b-a3b
+
+1. **Línea 950**: `exts_sql` usa `DOC_EXTENSIONS` para filtrar código (`extension NOT IN`). Esto excluye archivos de código que tengan extensiones de documento (ej. `.md` en código), en lugar de incluir solo extensiones de código.
+   *Caso*: Buscar `tipo="codigo"` en un archivo `script.py.md` que no está en `DOC_EXTENSIONS` pero sí en la lista de extensiones de código esperadas, o viceversa, si la lógica de `DOC_EXTENSIONS` no es el complemento exacto de las extensiones de código.
+
+2. **Línea 968**: `reranked_snippets` devuelve una lista de resultados reordenados, pero no se garantiza que mantengan los campos originales si la función de reranking no los propaga correctamente. Si `reranked` pierde campos clave como `id`, `rel_path` o `symbol_name`, las líneas siguientes (971-985) fallarán o filtrarán incorrectamente.
+   *Caso*: `ranker.rerank_snippets` devuelve solo `score` y `text`, sin los metadatos originales, causando `KeyError` o filtrado erróneo por `id` o `rel_path`.
+
+3. **Línea 993**: `query_sym` se calcula como `query.strip()` si coincide con `^[A-Za-z0-9_$]+$`, pero luego se usa para buscar en `r.get("content", "")`. Si `query` es una frase completa (ej. "funcion main"), `query_sym` será `None` y no se inyectará impacto, aunque el símbolo esté presente. Esto no es un error de ejecución, pero sí de lógica de impacto. Sin embargo, un error más crítico es la **Línea 995**: `dependents = impact.get_dependents(db, sym, project=r.get("project"))`. Si `r.get("project")` es `None` y la función `get_dependents` no maneja `None` como "todos los proyectos", podría fallar o devolver resultados incorrectos.
+   *Caso*: `r` no tiene campo `project` (es `None`), y `get_dependents` espera un string o lanza error al intentar filtrar por `project=None`.
+
+#### engine/filtro.py:filtrar (líneas 94-219) -- kaggle-qwen3.8-27b
+
+1. **Línea 104**: `lineas = _limpiar_lineas_raw(texto)` usa el texto original, pero la lógica de índices (`n`, `protegidas`) se basa en la lista resultante. Si `_limpiar_lineas_raw` elimina líneas (ej. barras de progreso `\r` o ANSI), los índices de `protegidas` calculados sobre `n` (longitud de `lineas`) son correctos para la lista `lineas`, pero la regla 1 ("menos de 40 líneas") se evalúa sobre `lineas_raw` (original). Si el texto original tiene 39 líneas pero tras limpiar tiene 50 (imposible, limpiar solo quita), o viceversa: si el original tiene 41 líneas pero tras limpiar quedan 39, se procesa. El error real es que `orig_line_count` se usa en el encabezado, pero la condición de salida temprana usa `lineas_raw`. Si `_limpiar_lineas_raw` devuelve una lista de longitud diferente a `lineas_raw` (lo cual es probable si limpia `\r`), la comparación `orig_line_count < 40` es inconsistente con el procesamiento posterior. **Caso**: Texto con 39 líneas originales que tras limpiar `\r` se convierten en 45 líneas lógicas (o viceversa, aunque limpiar suele reducir). Si el texto tiene 39 líneas crudas pero contiene muchos `\r` que al limpiar generan más líneas visibles (raro) o si la intención era filtrar basándose en el contenido limpio, la condición es incorrecta. Más concretamente: si `texto` tiene 39 líneas crudas, se devuelve sin filtrar. Si tiene 41 líneas crudas, se filtra. Pero si `_limpiar_lineas_raw` elimina líneas, `n` será menor. El problema crítico es que `protegidas` se calcula sobre `n` (líneas limpias), pero la regla 1 dice "según líneas originales". Si el usuario espera que se filtre basándose en el contenido final, la condición inicial es errónea. **Caso concreto**: Texto con 39 líneas crudas, pero que al limpiar `\r` se expande a 40+ líneas (imposible, splitlines no expande). Mejor caso: Texto con 41 líneas crudas, pero `_limpiar_lineas_raw` elimina 5 líneas de progreso, dejando 36. Se procesa y se filtra, pero la regla 1 dice "si menos de 40 líneas originales se devuelve igual". Aquí se filtra aunque el resultado sea corto. No es un error de crash, pero es un resultado equivocado respecto a la docstring.
+
+2. **Línea 118**: `if not _es_ruido_agrupado(linea) and RE_ERROR.search(linea):`. La función `_es_ruido_agrupado` no está definida en el fragmento, pero asumiendo que existe, el problema es que `RE_ERROR` podría coincidir con líneas que son ruido agrupado (ej. si el ruido contiene la palabra "error"). Sin embargo, el error más claro es que **`Set` y `List` no están importados** en el fragmento visible. Si el archivo no tiene `from typing import Set, List`, el programa fallará con `NameError` al ejecutar la función. **Caso**: Ejecutar `filtrar("texto largo...")` en un entorno donde `Set` y `List` no están en el namespace global del módulo.
+
+3. **Línea 152**: `if linea_act.strip() == "": resultado.append("")`. Si hay líneas vacías consecutivas no protegidas, el colapso de "casi iguales" tratará las líneas vacías como un patrón. `_patron_cuasi_igual("")` probablemente devuelve un patrón vacío o similar. Si hay 5 líneas vacías, se colapsan a `"" (x5)`. Pero la lógica dice: si `linea_act.strip() == ""`, añade `""` (sin el sufijo `(xN)`). Esto rompe la consistencia: las líneas vacías repetidas no muestran el conteo
+
+#### engine/filtro.py:filtrar (líneas 94-219) -- kaggle-qwen3.6-35b-a3b
+
+Sin errores claros.
+
+#### engine/cli.py:main (líneas 517-641) -- kaggle-qwen3.8-27b
+
+1. **Línea 530**: `installer.valor_de_perfil(sys.argv)` se llama dos veces en la misma condición. Si la primera llamada tiene efectos secundarios (como modificar el estado o consumir un iterador) o si `sys.argv` se modifica entre llamadas, la segunda evaluación podría fallar o dar un valor inconsistente. Además, si `valor_de_perfil` devuelve `None` o `False` pero `--perfil` está presente, la lógica `or` fuerza la ejecución de `configure_perfil` con un argumento potencialmente inválido (`None`), causando un error en `installer.configure_perfil`.
+   *Caso:* `python cli.py configure --perfil` (sin valor). `valor_de_perfil` devuelve `None`, pero `--perfil` está en `sys.argv`, así que se ejecuta `installer.configure_perfil(None)`, lo que probablemente lance un `TypeError` o `AttributeError` al intentar procesar `None`.
+
+2. **Línea 563**: `stats["por_archivo"]` asume que la clave existe y que su valor es un diccionario iterable con `.items()`. Si `empaquetar.empaquetar` devuelve `stats` con una estructura diferente (por ejemplo, una lista de tuplas, o si la clave es `por_archivo` pero es `None` en ciertos casos de error o carpeta vacía), el programa fallará con `KeyError` o `AttributeError`.
+   *Caso:* Empaquetar una carpeta vacía o con permisos restringidos donde `stats["por_archivo"]` es `None` o no existe, causando `TypeError: 'NoneType' object is not iterable` o `KeyError`.
+
+3. **Línea 585**: `query = " ".join(sys.argv[1:])` en el `else` final incluye el primer argumento (`arg1`) en la consulta de búsqueda. Si el usuario ejecuta un comando no reconocido (ej. `python cli.py typo`), `arg1` es `"typo"`, y la consulta se convierte en `"typo"`. Esto no es un error de sintaxis, pero si el usuario intenta usar un comando válido que no está en la lista (ej. `python cli.py search`), `search` se tratará como parte de la query, no como un comando. Sin embargo, el error más concreto es que si `sys.argv[1]` es un flag como `--verbose` (no reconocido), se incluirá en la query. Pero el error real es que **no hay validación de que `arg1` sea un comando válido antes de caer al `else`**. Si el usuario escribe `python cli.py --help extra`, `arg1` es `--help`, que se maneja arriba. Pero si escribe `python cli.py unknown_command`, `unknown_command` se busca. El error concreto es que **la lógica de `--project` (línea 578) requiere `len(sys.argv) > 3`**, pero si el usuario pasa `python cli.py --project` (sin proyecto ni query), cae al `else` y busca `"--project"`. Esto no es un error de crash, pero sí un resultado equivocado.
+   
+   *Corrección del error concreto:* En la línea 585, si el usuario ejecuta `python cli.py --project` (solo el flag, sin argumentos), `len(sys.argv)` es 2, así que no entra en la rama `elif arg1 == "--project" and len(sys.argv) > 3`. Cae al `else`, y `query` se convierte en `"--project"`. Esto busca literalmente la cadena `--project` en la base de datos, lo cual es un resultado equivocado y no un error de crash. Pero si el usuario ejecuta `python cli.py --project myproj` (sin query), `len(sys.argv)` es 3, no entra en la rama `elif` (que requiere >3), cae al `else`, y `query` es `"--project myproj"`. Esto también es un resultado equivocado.
+   
+   *Caso:* `python cli.py --project myproj`. El programa no muestra
+
+#### engine/cli.py:main (líneas 517-641) -- kaggle-qwen3.6-35b-a3b
+
+Sin errores claros.
+
+#### engine/telemetry.py:get_summary_stats (líneas 169-289) -- kaggle-qwen3.8-27b
+
+1. Línea 186: `min_dt.split()[0]` lanza `AttributeError` si `min_dt` es `None` (tabla vacía), ya que la condición `if min_dt` no protege el acceso al método antes de evaluar la expresión completa en Python.
+2. Línea 175: La consulta "Hoy" usa `timestamp >= ?` con un valor Unix (float), pero la columna `timestamp` podría ser de tipo `TEXT` o `DATETIME` (sugerido por el uso de `datetime_str` en la línea 186), lo que provoca una comparación de tipos inválida o resultados incorrectos en SQLite.
+3. Línea 169: La función no gestiona el caso donde `c.fetchone()` devuelve `None` (aunque `COUNT(*)` siempre devuelve una fila, si la conexión falla o hay un error de cursor previo no capturado específicamente, el `except` oculta el error real, pero el error concreto de lógica es que `all_q` etc. se asumen no nulos sin verificar la integridad de la fila si la base de datos está corrupta o la consulta falla parcialmente, aunque el `except` lo cubre; el error más claro es el de la línea 186). *Corrección*: El tercer error claro es que `int(all_ret)` en la línea 212 puede lanzar `ValueError` si `SUM` devuelve un valor no numérico o `None` inesperado por datos corruptos, aunque `COALESCE` lo previene; el error real es que `por_agente` puede contener `None` como clave si `agent` es `NULL`, lo que puede romper serializaciones JSON posteriores o lógica de negocio que espere strings.
+
+#### engine/telemetry.py:get_summary_stats (líneas 169-289) -- kaggle-qwen3.6-35b-a3b
+
+Sin errores claros.
+
+
+ERROR en busqueda: ErrorRed: OutOfMemoryError: CUDA out of memory. Tried to allocate 118.00 MiB. GPU 0 has a total capacity of 14.56 GiB of which 78.81 MiB is free. Process 150 has 7.67 GiB memory in use. Including non-PyTorch memory, this process has 6.81 GiB memory in use. Of the allocated memory 6.30 GiB is allocated by PyTorch, and 399.33 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See docume

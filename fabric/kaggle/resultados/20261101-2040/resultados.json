@@ -1,0 +1,60 @@
+{
+ "fecha": "2026-11-01 20:40",
+ "errores": {},
+ "nodos": [
+  {
+   "id": "fc964c9ca449d9a9",
+   "nombre": "kaggle-qwen3.6-35b-a3b",
+   "capacidades": [
+    "eco",
+    "generar"
+   ],
+   "info": {
+    "nucleos": 4,
+    "sistema": "Linux",
+    "gpus": 2,
+    "gpu": "Tesla T4",
+    "vram_gb": 31.3,
+    "modelo": "Qwen3.6-35B-A3B",
+    "llama": "binario oficial",
+    "local_tok_s": "6.9",
+    "local_prompt_tok_s": "1.0"
+   },
+   "carga": 0,
+   "completadas": 0
+  },
+  {
+   "id": "476d29acc4528ac8",
+   "nombre": "kaggle-qwen3.8-27b",
+   "capacidades": [
+    "eco",
+    "embeber",
+    "generar",
+    "reordenar"
+   ],
+   "info": {
+    "nucleos": 4,
+    "sistema": "Linux",
+    "gpus": 2,
+    "gpu": "Tesla T4",
+    "vram_gb": 31.3,
+    "modelo": "Qwen3.8-27B",
+    "llama": "binario oficial",
+    "local_tok_s": "5.7",
+    "local_prompt_tok_s": "1.0"
+   },
+   "carga": 0,
+   "completadas": 0
+  }
+ ],
+ "red": {
+  "kaggle-qwen3.6-35b-a3b": {
+   "mediana_ms": 366,
+   "max_ms": 922
+  },
+  "kaggle-qwen3.8-27b": {
+   "mediana_ms": 101,
+   "max_ms": 398
+  }
+ }
+}

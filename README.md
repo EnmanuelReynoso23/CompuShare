@@ -6,7 +6,7 @@
 
 ---
 
-## 💡 Manifiesto y Visión
+## Manifiesto y Visión
 
 Hoy en día, el acceso a la inteligencia artificial de vanguardia está hipercentralizado. Dependemos de un puñado de corporaciones que controlan la infraestructura y cobran por cada token generado. 
 
@@ -21,7 +21,7 @@ En CompuShare:
 
 ---
 
-## 🏛️ Arquitectura General
+## Arquitectura General
 
 ```mermaid
 flowchart TD
@@ -53,24 +53,23 @@ flowchart TD
 1. **Relé Maestro (`compushare-relay`):** Punto de encuentro ligero que distribuye los prompts entrantes hacia los nodos disponibles según su latencia, modelo cargado y carga actual.
 2. **Nodos Trabajadores (`compushare-worker`):** Ejecutan modelos de lenguaje abiertos (como Qwen 3.6/3.8, DeepSeek, Llama) usando motores de alto rendimiento como `llama.cpp` o `vLLM`.
 3. **Túneles Seguros:** Conexión de nodos detrás de NAT/firewalls mediante túneles Cloudflare, Tailscale o WebSockets directos.
-4. **Sinergia con SynRAG:** Los agentes que consumen CompuShare utilizan **SynRAG** como motor AST local para reducir hasta en un 60%+ la cantidad de tokens enviados por la red.
+4. **Sinergia con SynRAG:** Los agentes que consumen CompuShare utilizan **SynRAG** como motor AST local para mandar por la red solo los fragmentos de código que hacen falta. Medido en SynRAG: -63,9 % de tokens con un agente real en 10 tareas de varios pasos (CLAIMS fila 41 de SynRAG); no está medido sobre CompuShare.
 
 ---
 
-## 🚀 Hoja de Ruta (Roadmap)
+## Estado y plan
 
-- [x] **Fase 0 (Prototipo validado):** Pruebas de concepto iniciales en Kaggle con nodos maestro, trabajador, relé WebSocket y modelos Qwen vía `llama.cpp`.
-- [ ] **Fase 1 (Desacoplamiento):** Separación total del código de red de SynRAG hacia este repositorio; estandarización de scripts de inicialización de workers.
-- [ ] **Fase 2 (Protocolo de Descubrimiento):** Registro dinámico de nodos mediante tokens/identificadores sin necesidad de reconfigurar URLs a mano.
-- [ ] **Fase 3 (Tolerancia a Nodos Efímeros):** Reintento transparente de inferencia si una sesión de Kaggle/Colab expira a mitad de una respuesta.
-- [ ] **Fase 4 (CLI Universal):** `compushare join` para donar cómputo en 1 línea y `compushare serve` para levantar el endpoint local.
+Lo que funciona hoy está en `fabric/` (relé, tubo, nodos, reparto de capas, cuadernos de Kaggle).
+Medido el 1-nov-2026: un modelo dividido en 2 cuadernos de Kaggle (4 GPU) genera 10,3-10,8 tok/s
+(`fabric/kaggle/resultados/20261101-2040`). Fases, cifras y tareas: [PLAN.md](PLAN.md).
 
 ---
 
-## 📂 Estructura del Proyecto
+## Estructura del Proyecto
 
 ```text
 compushare/
+├── fabric/               # Red que ya funciona: relé, tubo, nodos, Kaggle (traído de synrag-fabric)
 ├── src/
 │   └── compushare/
 │       ├── __init__.py
@@ -89,6 +88,6 @@ compushare/
 
 ---
 
-## 📄 Licencia
+## Licencia
 
 Este proyecto está bajo la licencia **MIT** - consulta el archivo [LICENSE](LICENSE) para más detalles.
