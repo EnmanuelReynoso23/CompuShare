@@ -60,8 +60,9 @@ flowchart TD
 ## Estado y plan
 
 Lo que funciona hoy está en `fabric/` (relé, tubo, nodos, reparto de capas, cuadernos de Kaggle).
-Medido el 1-nov-2026: un modelo dividido en 2 cuadernos de Kaggle (4 GPU) genera 10,3-10,8 tok/s
-(`fabric/kaggle/resultados/20261101-2040`). Fases, cifras y tareas: [PLAN.md](PLAN.md).
+Medido el 31-oct-2026: Qwen3.5-9B Q8_0 dividido en 2 cuadernos de Kaggle (4 GPU) genera 10,3-10,8 tok/s
+con decodificación especulativa (`fabric/kaggle/resultados/20261031-dividido`). Fases y tareas:
+[PLAN.md](PLAN.md); la matemática de la red: [docs/MATEMATICA.md](docs/MATEMATICA.md).
 
 ---
 
