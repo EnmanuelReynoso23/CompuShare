@@ -33,6 +33,13 @@ class Perfil:
 
 # Perfiles listos con los valores de la tabla de fabric/PRUEBA-10.md
 PERFILES: dict[str, Perfil] = {
+    "sin retraso": Perfil(
+        nombre="sin retraso",
+        latencia_ms=0.0,
+        variacion_ms=0.0,
+        mbps=None,
+        perdida=0.0,
+    ),
     "misma ciudad": Perfil(
         nombre="misma ciudad",
         latencia_ms=10.0,
@@ -64,6 +71,8 @@ PERFILES: dict[str, Perfil] = {
 }
 
 _ALIAS_PERFILES: dict[str, str] = {
+    "sin_retraso": "sin retraso",
+    "directo": "sin retraso",
     "misma_ciudad": "misma ciudad",
     "ciudad": "misma ciudad",
     "mismo_pais": "mismo país",

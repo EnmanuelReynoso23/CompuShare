@@ -1,0 +1,650 @@
+[
+  {
+    "n_nodos": 2,
+    "perfil": "sin retraso",
+    "latencia_ms": 0.0,
+    "variacion_ms": 0.0,
+    "mbps": null,
+    "rtt_ms_teorico": 0.0,
+    "ms_por_palabra_mediana": 35.98,
+    "ms_por_palabra_runs": [
+      37.73,
+      35.78,
+      35.98
+    ],
+    "tok_s_generacion": 27.79,
+    "ms_prompt_por_token_mediana": 12.09,
+    "tok_s_prompt": 82.68,
+    "enlaces": [
+      {
+        "indice": 1,
+        "puerto_rpc": 51001,
+        "puerto_proxy": 51003,
+        "bytes_ida": 942856,
+        "bytes_vuelta": 94336,
+        "bytes_ida_por_token": 58928.5,
+        "bytes_vuelta_por_token": 5896.0,
+        "bytes_totales_por_token": 64824.5
+      },
+      {
+        "indice": 2,
+        "puerto_rpc": 51002,
+        "puerto_proxy": 51004,
+        "bytes_ida": 646896,
+        "bytes_vuelta": 15892608,
+        "bytes_ida_por_token": 40431.0,
+        "bytes_vuelta_por_token": 993288.0,
+        "bytes_totales_por_token": 1033719.0
+      }
+    ],
+    "bytes_ida_total_por_token": 99359.5,
+    "bytes_vuelta_total_por_token": 999184.0,
+    "bytes_total_por_token": 1098543.5,
+    "calculo_ms_calc": 29.27,
+    "calculo_ms_red": 0.01,
+    "calculo_ms_total": 29.28,
+    "calculo_tok_s": 34.15,
+    "desviacion_pct": 22.9,
+    "explicacion_desviacion": "En 'sin retraso', la latencia teorica es 0 ms, por lo que calculo.py solo computa tiempo de lectura de memoria (29.3 ms). La sobrecarga medida (36.0 ms vs 29.3 ms) proviene de la serializacion de grafos RPC en CPU, multiplexado de N=2 procesos en un solo CPU (13th Gen i5), y el retorno del tensor completo de logits (1099 KB/palabra) del ultimo nodo al maestro.",
+    "modelo": "Qwen3.5-0.8B-Q8_0.gguf",
+    "tokens_generados": 16,
+    "repeticiones": 3,
+    "fecha": "2026-11-04 11:26:02"
+  },
+  {
+    "n_nodos": 2,
+    "perfil": "misma ciudad",
+    "latencia_ms": 10.0,
+    "variacion_ms": 2.0,
+    "mbps": 100.0,
+    "rtt_ms_teorico": 20.0,
+    "ms_por_palabra_mediana": 176.69,
+    "ms_por_palabra_runs": [
+      177.17,
+      176.69,
+      174.83
+    ],
+    "tok_s_generacion": 5.66,
+    "ms_prompt_por_token_mediana": 34.23,
+    "tok_s_prompt": 29.21,
+    "enlaces": [
+      {
+        "indice": 1,
+        "puerto_rpc": 51006,
+        "puerto_proxy": 51008,
+        "bytes_ida": 942856,
+        "bytes_vuelta": 94336,
+        "bytes_ida_por_token": 58928.5,
+        "bytes_vuelta_por_token": 5896.0,
+        "bytes_totales_por_token": 64824.5
+      },
+      {
+        "indice": 2,
+        "puerto_rpc": 51007,
+        "puerto_proxy": 51009,
+        "bytes_ida": 646896,
+        "bytes_vuelta": 15892608,
+        "bytes_ida_por_token": 40431.0,
+        "bytes_vuelta_por_token": 993288.0,
+        "bytes_totales_por_token": 1033719.0
+      }
+    ],
+    "bytes_ida_total_por_token": 99359.5,
+    "bytes_vuelta_total_por_token": 999184.0,
+    "bytes_total_por_token": 1098543.5,
+    "calculo_ms_calc": 29.27,
+    "calculo_ms_red": 127.88,
+    "calculo_ms_total": 157.16,
+    "calculo_tok_s": 6.36,
+    "desviacion_pct": 12.4,
+    "explicacion_desviacion": "Calibracion adecuada: la desviacion esta dentro del margen del 20 %.",
+    "modelo": "Qwen3.5-0.8B-Q8_0.gguf",
+    "tokens_generados": 16,
+    "repeticiones": 3,
+    "fecha": "2026-11-04 11:27:24"
+  },
+  {
+    "n_nodos": 2,
+    "perfil": "mismo país",
+    "latencia_ms": 40.0,
+    "variacion_ms": 10.0,
+    "mbps": 50.0,
+    "rtt_ms_teorico": 80.0,
+    "ms_por_palabra_mediana": 433.63,
+    "ms_por_palabra_runs": [
+      429.85,
+      433.63,
+      434.77
+    ],
+    "tok_s_generacion": 2.31,
+    "ms_prompt_por_token_mediana": 74.67,
+    "tok_s_prompt": 13.39,
+    "enlaces": [
+      {
+        "indice": 1,
+        "puerto_rpc": 51011,
+        "puerto_proxy": 51013,
+        "bytes_ida": 942856,
+        "bytes_vuelta": 94336,
+        "bytes_ida_por_token": 58928.5,
+        "bytes_vuelta_por_token": 5896.0,
+        "bytes_totales_por_token": 64824.5
+      },
+      {
+        "indice": 2,
+        "puerto_rpc": 51012,
+        "puerto_proxy": 51014,
+        "bytes_ida": 646896,
+        "bytes_vuelta": 15892608,
+        "bytes_ida_por_token": 40431.0,
+        "bytes_vuelta_por_token": 993288.0,
+        "bytes_totales_por_token": 1033719.0
+      }
+    ],
+    "bytes_ida_total_por_token": 99359.5,
+    "bytes_vuelta_total_por_token": 999184.0,
+    "bytes_total_por_token": 1098543.5,
+    "calculo_ms_calc": 29.27,
+    "calculo_ms_red": 335.77,
+    "calculo_ms_total": 365.04,
+    "calculo_tok_s": 2.74,
+    "desviacion_pct": 18.8,
+    "explicacion_desviacion": "Calibracion adecuada: la desviacion esta dentro del margen del 20 %.",
+    "modelo": "Qwen3.5-0.8B-Q8_0.gguf",
+    "tokens_generados": 16,
+    "repeticiones": 3,
+    "fecha": "2026-11-04 11:30:14"
+  },
+  {
+    "n_nodos": 4,
+    "perfil": "sin retraso",
+    "latencia_ms": 0.0,
+    "variacion_ms": 0.0,
+    "mbps": null,
+    "rtt_ms_teorico": 0.0,
+    "ms_por_palabra_mediana": 63.28,
+    "ms_por_palabra_runs": [
+      63.28,
+      63.15,
+      63.67
+    ],
+    "tok_s_generacion": 15.8,
+    "ms_prompt_por_token_mediana": 16.85,
+    "tok_s_prompt": 59.34,
+    "enlaces": [
+      {
+        "indice": 1,
+        "puerto_rpc": 51016,
+        "puerto_proxy": 51020,
+        "bytes_ida": 681640,
+        "bytes_vuelta": 94336,
+        "bytes_ida_por_token": 42602.5,
+        "bytes_vuelta_por_token": 5896.0,
+        "bytes_totales_por_token": 48498.5
+      },
+      {
+        "indice": 2,
+        "puerto_rpc": 51017,
+        "puerto_proxy": 51021,
+        "bytes_ida": 407184,
+        "bytes_vuelta": 94336,
+        "bytes_ida_por_token": 25449.0,
+        "bytes_vuelta_por_token": 5896.0,
+        "bytes_totales_por_token": 31345.0
+      },
+      {
+        "indice": 3,
+        "puerto_rpc": 51018,
+        "puerto_proxy": 51022,
+        "bytes_ida": 425376,
+        "bytes_vuelta": 94336,
+        "bytes_ida_por_token": 26586.0,
+        "bytes_vuelta_por_token": 5896.0,
+        "bytes_totales_por_token": 32482.0
+      },
+      {
+        "indice": 4,
+        "puerto_rpc": 51019,
+        "puerto_proxy": 51023,
+        "bytes_ida": 367488,
+        "bytes_vuelta": 15892608,
+        "bytes_ida_por_token": 22968.0,
+        "bytes_vuelta_por_token": 993288.0,
+        "bytes_totales_por_token": 1016256.0
+      }
+    ],
+    "bytes_ida_total_por_token": 117605.5,
+    "bytes_vuelta_total_por_token": 1010976.0,
+    "bytes_total_por_token": 1128581.5,
+    "calculo_ms_calc": 29.27,
+    "calculo_ms_red": 0.01,
+    "calculo_ms_total": 29.28,
+    "calculo_tok_s": 34.15,
+    "desviacion_pct": 116.1,
+    "explicacion_desviacion": "En 'sin retraso', la latencia teorica es 0 ms, por lo que calculo.py solo computa tiempo de lectura de memoria (29.3 ms). La sobrecarga medida (63.3 ms vs 29.3 ms) proviene de la serializacion de grafos RPC en CPU, multiplexado de N=4 procesos en un solo CPU (13th Gen i5), y el retorno del tensor completo de logits (1129 KB/palabra) del ultimo nodo al maestro.",
+    "modelo": "Qwen3.5-0.8B-Q8_0.gguf",
+    "tokens_generados": 16,
+    "repeticiones": 3,
+    "fecha": "2026-11-04 11:30:23"
+  },
+  {
+    "n_nodos": 4,
+    "perfil": "misma ciudad",
+    "latencia_ms": 10.0,
+    "variacion_ms": 2.0,
+    "mbps": 100.0,
+    "rtt_ms_teorico": 20.0,
+    "ms_por_palabra_mediana": 249.85,
+    "ms_por_palabra_runs": [
+      249.85,
+      249.12,
+      250.17
+    ],
+    "tok_s_generacion": 4.0,
+    "ms_prompt_por_token_mediana": 48.7,
+    "tok_s_prompt": 20.53,
+    "enlaces": [
+      {
+        "indice": 1,
+        "puerto_rpc": 51025,
+        "puerto_proxy": 51029,
+        "bytes_ida": 681640,
+        "bytes_vuelta": 94336,
+        "bytes_ida_por_token": 42602.5,
+        "bytes_vuelta_por_token": 5896.0,
+        "bytes_totales_por_token": 48498.5
+      },
+      {
+        "indice": 2,
+        "puerto_rpc": 51026,
+        "puerto_proxy": 51030,
+        "bytes_ida": 407184,
+        "bytes_vuelta": 94336,
+        "bytes_ida_por_token": 25449.0,
+        "bytes_vuelta_por_token": 5896.0,
+        "bytes_totales_por_token": 31345.0
+      },
+      {
+        "indice": 3,
+        "puerto_rpc": 51027,
+        "puerto_proxy": 51031,
+        "bytes_ida": 425376,
+        "bytes_vuelta": 94336,
+        "bytes_ida_por_token": 26586.0,
+        "bytes_vuelta_por_token": 5896.0,
+        "bytes_totales_por_token": 32482.0
+      },
+      {
+        "indice": 4,
+        "puerto_rpc": 51028,
+        "puerto_proxy": 51032,
+        "bytes_ida": 367488,
+        "bytes_vuelta": 15892608,
+        "bytes_ida_por_token": 22968.0,
+        "bytes_vuelta_por_token": 993288.0,
+        "bytes_totales_por_token": 1016256.0
+      }
+    ],
+    "bytes_ida_total_por_token": 117605.5,
+    "bytes_vuelta_total_por_token": 1010976.0,
+    "bytes_total_por_token": 1128581.5,
+    "calculo_ms_calc": 29.27,
+    "calculo_ms_red": 170.29,
+    "calculo_ms_total": 199.56,
+    "calculo_tok_s": 5.01,
+    "desviacion_pct": 25.2,
+    "explicacion_desviacion": "Con N=4 nodos distribuidos en estrella, llama.cpp realiza 4 ciclos secuenciales de peticion-respuesta (ida y vuelta) por token generado. Al acumular jitter y despacho de 4 procesos en la misma CPU, el tiempo de sincronizacion entre hilos de la laptop agrega sobrecarga al RTT simulado. El ultimo nodo retorna los logits completos de 248.322 tokens (1129 KB) en cada palabra, lo que incrementa el tiempo de transmision frente a la asuncion de calculo.py de transferir unicamente la activacion oculta (8 KB).",
+    "modelo": "Qwen3.5-0.8B-Q8_0.gguf",
+    "tokens_generados": 16,
+    "repeticiones": 3,
+    "fecha": "2026-11-04 11:31:52"
+  },
+  {
+    "n_nodos": 4,
+    "perfil": "mismo país",
+    "latencia_ms": 40.0,
+    "variacion_ms": 10.0,
+    "mbps": 50.0,
+    "rtt_ms_teorico": 80.0,
+    "ms_por_palabra_mediana": 668.21,
+    "ms_por_palabra_runs": [
+      668.21,
+      665.86,
+      671.29
+    ],
+    "tok_s_generacion": 1.5,
+    "ms_prompt_por_token_mediana": 115.29,
+    "tok_s_prompt": 8.67,
+    "enlaces": [
+      {
+        "indice": 1,
+        "puerto_rpc": 51034,
+        "puerto_proxy": 51038,
+        "bytes_ida": 681640,
+        "bytes_vuelta": 94336,
+        "bytes_ida_por_token": 42602.5,
+        "bytes_vuelta_por_token": 5896.0,
+        "bytes_totales_por_token": 48498.5
+      },
+      {
+        "indice": 2,
+        "puerto_rpc": 51035,
+        "puerto_proxy": 51039,
+        "bytes_ida": 407184,
+        "bytes_vuelta": 94336,
+        "bytes_ida_por_token": 25449.0,
+        "bytes_vuelta_por_token": 5896.0,
+        "bytes_totales_por_token": 31345.0
+      },
+      {
+        "indice": 3,
+        "puerto_rpc": 51036,
+        "puerto_proxy": 51040,
+        "bytes_ida": 425376,
+        "bytes_vuelta": 94336,
+        "bytes_ida_por_token": 26586.0,
+        "bytes_vuelta_por_token": 5896.0,
+        "bytes_totales_por_token": 32482.0
+      },
+      {
+        "indice": 4,
+        "puerto_rpc": 51037,
+        "puerto_proxy": 51041,
+        "bytes_ida": 367488,
+        "bytes_vuelta": 15892608,
+        "bytes_ida_por_token": 22968.0,
+        "bytes_vuelta_por_token": 993288.0,
+        "bytes_totales_por_token": 1016256.0
+      }
+    ],
+    "bytes_ida_total_por_token": 117605.5,
+    "bytes_vuelta_total_por_token": 1010976.0,
+    "bytes_total_por_token": 1128581.5,
+    "calculo_ms_calc": 29.27,
+    "calculo_ms_red": 500.57,
+    "calculo_ms_total": 529.84,
+    "calculo_tok_s": 1.89,
+    "desviacion_pct": 26.1,
+    "explicacion_desviacion": "Con N=4 nodos distribuidos en estrella, llama.cpp realiza 4 ciclos secuenciales de peticion-respuesta (ida y vuelta) por token generado. Al acumular jitter y despacho de 4 procesos en la misma CPU, el tiempo de sincronizacion entre hilos de la laptop agrega sobrecarga al RTT simulado. El ultimo nodo retorna los logits completos de 248.322 tokens (1129 KB) en cada palabra, lo que incrementa el tiempo de transmision frente a la asuncion de calculo.py de transferir unicamente la activacion oculta (8 KB).",
+    "modelo": "Qwen3.5-0.8B-Q8_0.gguf",
+    "tokens_generados": 16,
+    "repeticiones": 3,
+    "fecha": "2026-11-04 11:35:08"
+  },
+  {
+    "n_nodos": 6,
+    "perfil": "sin retraso",
+    "latencia_ms": 0.0,
+    "variacion_ms": 0.0,
+    "mbps": null,
+    "rtt_ms_teorico": 0.0,
+    "ms_por_palabra_mediana": 62.29,
+    "ms_por_palabra_runs": [
+      62.29,
+      59.51,
+      63.84
+    ],
+    "tok_s_generacion": 16.05,
+    "ms_prompt_por_token_mediana": 17.39,
+    "tok_s_prompt": 57.5,
+    "enlaces": [
+      {
+        "indice": 1,
+        "puerto_rpc": 51043,
+        "puerto_proxy": 51049,
+        "bytes_ida": 582440,
+        "bytes_vuelta": 94336,
+        "bytes_ida_por_token": 36402.5,
+        "bytes_vuelta_por_token": 5896.0,
+        "bytes_totales_por_token": 42298.5
+      },
+      {
+        "indice": 2,
+        "puerto_rpc": 51044,
+        "puerto_proxy": 51050,
+        "bytes_ida": 326176,
+        "bytes_vuelta": 94336,
+        "bytes_ida_por_token": 20386.0,
+        "bytes_vuelta_por_token": 5896.0,
+        "bytes_totales_por_token": 26282.0
+      },
+      {
+        "indice": 3,
+        "puerto_rpc": 51045,
+        "puerto_proxy": 51051,
+        "bytes_ida": 326176,
+        "bytes_vuelta": 94336,
+        "bytes_ida_por_token": 20386.0,
+        "bytes_vuelta_por_token": 5896.0,
+        "bytes_totales_por_token": 26282.0
+      },
+      {
+        "indice": 4,
+        "puerto_rpc": 51046,
+        "puerto_proxy": 51052,
+        "bytes_ida": 326176,
+        "bytes_vuelta": 94336,
+        "bytes_ida_por_token": 20386.0,
+        "bytes_vuelta_por_token": 5896.0,
+        "bytes_totales_por_token": 26282.0
+      },
+      {
+        "indice": 5,
+        "puerto_rpc": 51047,
+        "puerto_proxy": 51053,
+        "bytes_ida": 326176,
+        "bytes_vuelta": 94336,
+        "bytes_ida_por_token": 20386.0,
+        "bytes_vuelta_por_token": 5896.0,
+        "bytes_totales_por_token": 26282.0
+      },
+      {
+        "indice": 6,
+        "puerto_rpc": 51048,
+        "puerto_proxy": 51054,
+        "bytes_ida": 286480,
+        "bytes_vuelta": 15892608,
+        "bytes_ida_por_token": 17905.0,
+        "bytes_vuelta_por_token": 993288.0,
+        "bytes_totales_por_token": 1011193.0
+      }
+    ],
+    "bytes_ida_total_por_token": 135851.5,
+    "bytes_vuelta_total_por_token": 1022768.0,
+    "bytes_total_por_token": 1158619.5,
+    "calculo_ms_calc": 29.27,
+    "calculo_ms_red": 0.01,
+    "calculo_ms_total": 29.28,
+    "calculo_tok_s": 34.15,
+    "desviacion_pct": 112.7,
+    "explicacion_desviacion": "En 'sin retraso', la latencia teorica es 0 ms, por lo que calculo.py solo computa tiempo de lectura de memoria (29.3 ms). La sobrecarga medida (62.3 ms vs 29.3 ms) proviene de la serializacion de grafos RPC en CPU, multiplexado de N=6 procesos en un solo CPU (13th Gen i5), y el retorno del tensor completo de logits (1159 KB/palabra) del ultimo nodo al maestro.",
+    "modelo": "Qwen3.5-0.8B-Q8_0.gguf",
+    "tokens_generados": 16,
+    "repeticiones": 3,
+    "fecha": "2026-11-04 11:35:17"
+  },
+  {
+    "n_nodos": 6,
+    "perfil": "misma ciudad",
+    "latencia_ms": 10.0,
+    "variacion_ms": 2.0,
+    "mbps": 100.0,
+    "rtt_ms_teorico": 20.0,
+    "ms_por_palabra_mediana": 306.67,
+    "ms_por_palabra_runs": [
+      308.21,
+      304.61,
+      306.67
+    ],
+    "tok_s_generacion": 3.26,
+    "ms_prompt_por_token_mediana": 58.65,
+    "tok_s_prompt": 17.05,
+    "enlaces": [
+      {
+        "indice": 1,
+        "puerto_rpc": 51056,
+        "puerto_proxy": 51062,
+        "bytes_ida": 582440,
+        "bytes_vuelta": 94336,
+        "bytes_ida_por_token": 36402.5,
+        "bytes_vuelta_por_token": 5896.0,
+        "bytes_totales_por_token": 42298.5
+      },
+      {
+        "indice": 2,
+        "puerto_rpc": 51057,
+        "puerto_proxy": 51063,
+        "bytes_ida": 326176,
+        "bytes_vuelta": 94336,
+        "bytes_ida_por_token": 20386.0,
+        "bytes_vuelta_por_token": 5896.0,
+        "bytes_totales_por_token": 26282.0
+      },
+      {
+        "indice": 3,
+        "puerto_rpc": 51058,
+        "puerto_proxy": 51064,
+        "bytes_ida": 326176,
+        "bytes_vuelta": 94336,
+        "bytes_ida_por_token": 20386.0,
+        "bytes_vuelta_por_token": 5896.0,
+        "bytes_totales_por_token": 26282.0
+      },
+      {
+        "indice": 4,
+        "puerto_rpc": 51059,
+        "puerto_proxy": 51065,
+        "bytes_ida": 326176,
+        "bytes_vuelta": 94336,
+        "bytes_ida_por_token": 20386.0,
+        "bytes_vuelta_por_token": 5896.0,
+        "bytes_totales_por_token": 26282.0
+      },
+      {
+        "indice": 5,
+        "puerto_rpc": 51060,
+        "puerto_proxy": 51066,
+        "bytes_ida": 326176,
+        "bytes_vuelta": 94336,
+        "bytes_ida_por_token": 20386.0,
+        "bytes_vuelta_por_token": 5896.0,
+        "bytes_totales_por_token": 26282.0
+      },
+      {
+        "indice": 6,
+        "puerto_rpc": 51061,
+        "puerto_proxy": 51067,
+        "bytes_ida": 286480,
+        "bytes_vuelta": 15892608,
+        "bytes_ida_por_token": 17905.0,
+        "bytes_vuelta_por_token": 993288.0,
+        "bytes_totales_por_token": 1011193.0
+      }
+    ],
+    "bytes_ida_total_por_token": 135851.5,
+    "bytes_vuelta_total_por_token": 1022768.0,
+    "bytes_total_por_token": 1158619.5,
+    "calculo_ms_calc": 29.27,
+    "calculo_ms_red": 212.69,
+    "calculo_ms_total": 241.96,
+    "calculo_tok_s": 4.13,
+    "desviacion_pct": 26.7,
+    "explicacion_desviacion": "Con N=6 nodos distribuidos en estrella, llama.cpp realiza 6 ciclos secuenciales de peticion-respuesta (ida y vuelta) por token generado. Al acumular jitter y despacho de 6 procesos en la misma CPU, el tiempo de sincronizacion entre hilos de la laptop agrega sobrecarga al RTT simulado. El ultimo nodo retorna los logits completos de 248.322 tokens (1159 KB) en cada palabra, lo que incrementa el tiempo de transmision frente a la asuncion de calculo.py de transferir unicamente la activacion oculta (8 KB).",
+    "modelo": "Qwen3.5-0.8B-Q8_0.gguf",
+    "tokens_generados": 16,
+    "repeticiones": 3,
+    "fecha": "2026-11-04 11:36:52"
+  },
+  {
+    "n_nodos": 6,
+    "perfil": "mismo país",
+    "latencia_ms": 40.0,
+    "variacion_ms": 10.0,
+    "mbps": 50.0,
+    "rtt_ms_teorico": 80.0,
+    "ms_por_palabra_mediana": 882.65,
+    "ms_por_palabra_runs": [
+      882.65,
+      881.49,
+      889.87
+    ],
+    "tok_s_generacion": 1.13,
+    "ms_prompt_por_token_mediana": 143.58,
+    "tok_s_prompt": 6.96,
+    "enlaces": [
+      {
+        "indice": 1,
+        "puerto_rpc": 51069,
+        "puerto_proxy": 51075,
+        "bytes_ida": 582440,
+        "bytes_vuelta": 94336,
+        "bytes_ida_por_token": 36402.5,
+        "bytes_vuelta_por_token": 5896.0,
+        "bytes_totales_por_token": 42298.5
+      },
+      {
+        "indice": 2,
+        "puerto_rpc": 51070,
+        "puerto_proxy": 51076,
+        "bytes_ida": 326176,
+        "bytes_vuelta": 94336,
+        "bytes_ida_por_token": 20386.0,
+        "bytes_vuelta_por_token": 5896.0,
+        "bytes_totales_por_token": 26282.0
+      },
+      {
+        "indice": 3,
+        "puerto_rpc": 51071,
+        "puerto_proxy": 51077,
+        "bytes_ida": 326176,
+        "bytes_vuelta": 94336,
+        "bytes_ida_por_token": 20386.0,
+        "bytes_vuelta_por_token": 5896.0,
+        "bytes_totales_por_token": 26282.0
+      },
+      {
+        "indice": 4,
+        "puerto_rpc": 51072,
+        "puerto_proxy": 51078,
+        "bytes_ida": 326176,
+        "bytes_vuelta": 94336,
+        "bytes_ida_por_token": 20386.0,
+        "bytes_vuelta_por_token": 5896.0,
+        "bytes_totales_por_token": 26282.0
+      },
+      {
+        "indice": 5,
+        "puerto_rpc": 51073,
+        "puerto_proxy": 51079,
+        "bytes_ida": 326176,
+        "bytes_vuelta": 94336,
+        "bytes_ida_por_token": 20386.0,
+        "bytes_vuelta_por_token": 5896.0,
+        "bytes_totales_por_token": 26282.0
+      },
+      {
+        "indice": 6,
+        "puerto_rpc": 51074,
+        "puerto_proxy": 51080,
+        "bytes_ida": 286480,
+        "bytes_vuelta": 15892608,
+        "bytes_ida_por_token": 17905.0,
+        "bytes_vuelta_por_token": 993288.0,
+        "bytes_totales_por_token": 1011193.0
+      }
+    ],
+    "bytes_ida_total_por_token": 135851.5,
+    "bytes_vuelta_total_por_token": 1022768.0,
+    "bytes_total_por_token": 1158619.5,
+    "calculo_ms_calc": 29.27,
+    "calculo_ms_red": 665.38,
+    "calculo_ms_total": 694.65,
+    "calculo_tok_s": 1.44,
+    "desviacion_pct": 27.1,
+    "explicacion_desviacion": "Con N=6 nodos distribuidos en estrella, llama.cpp realiza 6 ciclos secuenciales de peticion-respuesta (ida y vuelta) por token generado. Al acumular jitter y despacho de 6 procesos en la misma CPU, el tiempo de sincronizacion entre hilos de la laptop agrega sobrecarga al RTT simulado. El ultimo nodo retorna los logits completos de 248.322 tokens (1159 KB) en cada palabra, lo que incrementa el tiempo de transmision frente a la asuncion de calculo.py de transferir unicamente la activacion oculta (8 KB).",
+    "modelo": "Qwen3.5-0.8B-Q8_0.gguf",
+    "tokens_generados": 16,
+    "repeticiones": 3,
+    "fecha": "2026-11-04 11:40:31"
+  }
+]
