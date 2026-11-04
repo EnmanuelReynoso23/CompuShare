@@ -331,6 +331,8 @@ class Rele:
             await self.nuevo_mensaje(par, m)
         elif t == "responder":
             await self.responder_mensaje(par, m)
+        elif t in ("senalar", "p2p_oferta", "p2p_respuesta", "p2p_candidato", "sdp_oferta", "sdp_respuesta"):
+            await self.senalar(par, m)
 
     async def pedir_tarea(self, par: Par, m: dict[str, Any]) -> None:
         id_cliente = str(m.get("id") or "")[:48]
@@ -395,6 +397,16 @@ class Rele:
         if isinstance(m.get("ms"), (int, float)):
             mensaje["ms"] = int(m["ms"])
         await self.difundir(par.enjambre, {"t": "mensaje", "mensaje": mensaje})
+
+    async def senalar(self, par: Par, m: dict[str, Any]) -> None:
+        para_id = str(m.get("para") or "")
+        destino = self.pares.get(para_id)
+        if destino is None or destino.enjambre != par.enjambre:
+            await self.enviar(par, {"t": "error", "mensaje": "destino_no_encontrado", "para": para_id})
+            return
+        carga = {k: v for k, v in m.items() if k != "para"}
+        carga["de"] = par.id
+        await self.enviar(destino, carga)
 
     # ── limpieza ────────────────────────────────────────────────────────────
 

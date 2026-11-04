@@ -1,0 +1,313 @@
+{
+  "fecha": "2026-11-04T15:25:06.192276+00:00",
+  "volumen_mb": 5,
+  "repeticiones": 3,
+  "muestras_rtt": 20,
+  "carga_sistema_loadavg": [
+    1.4638671875,
+    1.48974609375,
+    1.619140625
+  ],
+  "resultados": [
+    {
+      "tiempo_establecimiento_ms": 0.25,
+      "caudal_mb_s": 670.0,
+      "rtt_medio_ms": 0.025,
+      "rtt_min_ms": 0.02,
+      "rtt_max_ms": 0.075,
+      "caso": "1. TCP Directo Local (referencia kernel)",
+      "simulador": false,
+      "repeticion": 1
+    },
+    {
+      "tiempo_establecimiento_ms": 0.18,
+      "caudal_mb_s": 810.38,
+      "rtt_medio_ms": 0.014,
+      "rtt_min_ms": 0.012,
+      "rtt_max_ms": 0.029,
+      "caso": "1. TCP Directo Local (referencia kernel)",
+      "simulador": false,
+      "repeticion": 2
+    },
+    {
+      "tiempo_establecimiento_ms": 0.17,
+      "caudal_mb_s": 1075.64,
+      "rtt_medio_ms": 0.014,
+      "rtt_min_ms": 0.012,
+      "rtt_max_ms": 0.031,
+      "caso": "1. TCP Directo Local (referencia kernel)",
+      "simulador": false,
+      "repeticion": 3
+    },
+    {
+      "tiempo_establecimiento_ms": 0.2,
+      "caudal_mb_s": 5.15,
+      "rtt_medio_ms": 86.664,
+      "rtt_min_ms": 67.437,
+      "rtt_max_ms": 113.426,
+      "caso": "1. TCP Directo con Simulador ('mismo país')",
+      "simulador": true,
+      "repeticion": 1
+    },
+    {
+      "tiempo_establecimiento_ms": 0.19,
+      "caudal_mb_s": 5.12,
+      "rtt_medio_ms": 80.563,
+      "rtt_min_ms": 55.578,
+      "rtt_max_ms": 104.419,
+      "caso": "1. TCP Directo con Simulador ('mismo país')",
+      "simulador": true,
+      "repeticion": 2
+    },
+    {
+      "tiempo_establecimiento_ms": 0.2,
+      "caudal_mb_s": 5.1,
+      "rtt_medio_ms": 78.226,
+      "rtt_min_ms": 47.262,
+      "rtt_max_ms": 97.497,
+      "caso": "1. TCP Directo con Simulador ('mismo país')",
+      "simulador": true,
+      "repeticion": 3
+    },
+    {
+      "tiempo_establecimiento_ms": 0.16,
+      "caudal_mb_s": 356.89,
+      "rtt_medio_ms": 0.107,
+      "rtt_min_ms": 0.063,
+      "rtt_max_ms": 0.857,
+      "caso": "2. Relé WebSocket Python (fabric.tubo) - Local",
+      "simulador": false,
+      "repeticion": 1
+    },
+    {
+      "tiempo_establecimiento_ms": 0.15,
+      "caudal_mb_s": 395.35,
+      "rtt_medio_ms": 0.097,
+      "rtt_min_ms": 0.062,
+      "rtt_max_ms": 0.672,
+      "caso": "2. Relé WebSocket Python (fabric.tubo) - Local",
+      "simulador": false,
+      "repeticion": 2
+    },
+    {
+      "tiempo_establecimiento_ms": 0.14,
+      "caudal_mb_s": 398.36,
+      "rtt_medio_ms": 0.094,
+      "rtt_min_ms": 0.063,
+      "rtt_max_ms": 0.648,
+      "caso": "2. Relé WebSocket Python (fabric.tubo) - Local",
+      "simulador": false,
+      "repeticion": 3
+    },
+    {
+      "tiempo_establecimiento_ms": 0.15,
+      "caudal_mb_s": 5.08,
+      "rtt_medio_ms": 81.984,
+      "rtt_min_ms": 66.581,
+      "rtt_max_ms": 102.56,
+      "caso": "2. Relé WebSocket Python (fabric.tubo) - Simulador ('mismo país')",
+      "simulador": true,
+      "repeticion": 1
+    },
+    {
+      "tiempo_establecimiento_ms": 0.16,
+      "caudal_mb_s": 5.16,
+      "rtt_medio_ms": 83.507,
+      "rtt_min_ms": 54.485,
+      "rtt_max_ms": 111.056,
+      "caso": "2. Relé WebSocket Python (fabric.tubo) - Simulador ('mismo país')",
+      "simulador": true,
+      "repeticion": 2
+    },
+    {
+      "tiempo_establecimiento_ms": 0.15,
+      "caudal_mb_s": 5.13,
+      "rtt_medio_ms": 81.445,
+      "rtt_min_ms": 46.629,
+      "rtt_max_ms": 118.872,
+      "caso": "2. Relé WebSocket Python (fabric.tubo) - Simulador ('mismo país')",
+      "simulador": true,
+      "repeticion": 3
+    },
+    {
+      "tiempo_establecimiento_ms": 156.23,
+      "caudal_mb_s": 6.31,
+      "rtt_medio_ms": 0.194,
+      "rtt_min_ms": 0.178,
+      "rtt_max_ms": 0.312,
+      "caso": "3. Directo WebRTC Python (aiortc + STUN) - Local",
+      "simulador": false,
+      "repeticion": 1
+    },
+    {
+      "tiempo_establecimiento_ms": 120.49,
+      "caudal_mb_s": 6.28,
+      "rtt_medio_ms": 0.193,
+      "rtt_min_ms": 0.178,
+      "rtt_max_ms": 0.3,
+      "caso": "3. Directo WebRTC Python (aiortc + STUN) - Local",
+      "simulador": false,
+      "repeticion": 2
+    },
+    {
+      "tiempo_establecimiento_ms": 117.66,
+      "caudal_mb_s": 6.21,
+      "rtt_medio_ms": 0.19,
+      "rtt_min_ms": 0.178,
+      "rtt_max_ms": 0.29,
+      "caso": "3. Directo WebRTC Python (aiortc + STUN) - Local",
+      "simulador": false,
+      "repeticion": 3
+    },
+    {
+      "tiempo_establecimiento_ms": 109.4,
+      "caudal_mb_s": 5.05,
+      "rtt_medio_ms": 82.946,
+      "rtt_min_ms": 59.683,
+      "rtt_max_ms": 103.837,
+      "caso": "3. Directo WebRTC Python (aiortc + STUN) - Simulador ('mismo país')",
+      "simulador": true,
+      "repeticion": 1
+    },
+    {
+      "tiempo_establecimiento_ms": 106.53,
+      "caudal_mb_s": 5.02,
+      "rtt_medio_ms": 77.692,
+      "rtt_min_ms": 50.681,
+      "rtt_max_ms": 103.82,
+      "caso": "3. Directo WebRTC Python (aiortc + STUN) - Simulador ('mismo país')",
+      "simulador": true,
+      "repeticion": 2
+    },
+    {
+      "tiempo_establecimiento_ms": 110.02,
+      "caudal_mb_s": 5.05,
+      "rtt_medio_ms": 87.608,
+      "rtt_min_ms": 61.136,
+      "rtt_max_ms": 113.019,
+      "caso": "3. Directo WebRTC Python (aiortc + STUN) - Simulador ('mismo país')",
+      "simulador": true,
+      "repeticion": 3
+    },
+    {
+      "tiempo_establecimiento_ms": 202.21,
+      "caudal_mb_s": 210.67,
+      "rtt_medio_ms": 0.133,
+      "rtt_min_ms": 0.068,
+      "rtt_max_ms": 0.635,
+      "caso": "4. CompuShare Directo Go (Pion ICE + QUIC) - Local",
+      "simulador": false,
+      "repeticion": 1
+    },
+    {
+      "tiempo_establecimiento_ms": 202.1,
+      "caudal_mb_s": 213.43,
+      "rtt_medio_ms": 0.103,
+      "rtt_min_ms": 0.06,
+      "rtt_max_ms": 0.354,
+      "caso": "4. CompuShare Directo Go (Pion ICE + QUIC) - Local",
+      "simulador": false,
+      "repeticion": 2
+    },
+    {
+      "tiempo_establecimiento_ms": 201.74,
+      "caudal_mb_s": 194.75,
+      "rtt_medio_ms": 0.107,
+      "rtt_min_ms": 0.06,
+      "rtt_max_ms": 0.385,
+      "caso": "4. CompuShare Directo Go (Pion ICE + QUIC) - Local",
+      "simulador": false,
+      "repeticion": 3
+    },
+    {
+      "tiempo_establecimiento_ms": 202.39,
+      "caudal_mb_s": 5.17,
+      "rtt_medio_ms": 82.193,
+      "rtt_min_ms": 59.947,
+      "rtt_max_ms": 104.053,
+      "caso": "4. CompuShare Directo Go (Pion ICE + QUIC) - Simulador ('mismo país')",
+      "simulador": true,
+      "repeticion": 1
+    },
+    {
+      "tiempo_establecimiento_ms": 203.34,
+      "caudal_mb_s": 5.13,
+      "rtt_medio_ms": 79.899,
+      "rtt_min_ms": 47.498,
+      "rtt_max_ms": 117.987,
+      "caso": "4. CompuShare Directo Go (Pion ICE + QUIC) - Simulador ('mismo país')",
+      "simulador": true,
+      "repeticion": 2
+    },
+    {
+      "tiempo_establecimiento_ms": 201.88,
+      "caudal_mb_s": 5.14,
+      "rtt_medio_ms": 82.476,
+      "rtt_min_ms": 59.706,
+      "rtt_max_ms": 106.817,
+      "caso": "4. CompuShare Directo Go (Pion ICE + QUIC) - Simulador ('mismo país')",
+      "simulador": true,
+      "repeticion": 3
+    },
+    {
+      "tiempo_establecimiento_ms": 101.84,
+      "caudal_mb_s": 457.69,
+      "rtt_medio_ms": 0.144,
+      "rtt_min_ms": 0.064,
+      "rtt_max_ms": 1.29,
+      "caso": "5. CompuShare Directo Go Fallback a Relé - Local",
+      "simulador": false,
+      "repeticion": 1
+    },
+    {
+      "tiempo_establecimiento_ms": 101.9,
+      "caudal_mb_s": 444.21,
+      "rtt_medio_ms": 0.117,
+      "rtt_min_ms": 0.066,
+      "rtt_max_ms": 0.846,
+      "caso": "5. CompuShare Directo Go Fallback a Relé - Local",
+      "simulador": false,
+      "repeticion": 2
+    },
+    {
+      "tiempo_establecimiento_ms": 101.96,
+      "caudal_mb_s": 402.4,
+      "rtt_medio_ms": 0.132,
+      "rtt_min_ms": 0.067,
+      "rtt_max_ms": 1.159,
+      "caso": "5. CompuShare Directo Go Fallback a Relé - Local",
+      "simulador": false,
+      "repeticion": 3
+    },
+    {
+      "tiempo_establecimiento_ms": 101.88,
+      "caudal_mb_s": 5.09,
+      "rtt_medio_ms": 81.295,
+      "rtt_min_ms": 52.672,
+      "rtt_max_ms": 115.741,
+      "caso": "5. CompuShare Directo Go Fallback a Relé - Simulador ('mismo país')",
+      "simulador": true,
+      "repeticion": 1
+    },
+    {
+      "tiempo_establecimiento_ms": 102.61,
+      "caudal_mb_s": 5.1,
+      "rtt_medio_ms": 85.679,
+      "rtt_min_ms": 60.791,
+      "rtt_max_ms": 121.186,
+      "caso": "5. CompuShare Directo Go Fallback a Relé - Simulador ('mismo país')",
+      "simulador": true,
+      "repeticion": 2
+    },
+    {
+      "tiempo_establecimiento_ms": 102.38,
+      "caudal_mb_s": 5.14,
+      "rtt_medio_ms": 78.415,
+      "rtt_min_ms": 45.24,
+      "rtt_max_ms": 99.828,
+      "caso": "5. CompuShare Directo Go Fallback a Relé - Simulador ('mismo país')",
+      "simulador": true,
+      "repeticion": 3
+    }
+  ]
+}

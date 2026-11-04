@@ -287,3 +287,44 @@ def test_tubo_rechaza_clave_mala():
                     await asyncio.wait_for(ws.recv(), 3)
 
     asyncio.run(caso())
+
+
+def test_senalar_p2p_entre_pares():
+    async def caso():
+        async with red() as (url, _c, _n):
+            async with connect(url) as ws_a, connect(url) as ws_b:
+                await ws_a.send(json.dumps({"t": "hola", "clave": CLAVE, "enjambre": "pruebas", "rol": "cliente", "id": "peer-a"}))
+                resp_a = json.loads(await ws_a.recv())
+                assert resp_a["id"] == "peer-a"
+
+                await ws_b.send(json.dumps({"t": "hola", "clave": CLAVE, "enjambre": "pruebas", "rol": "nodo", "id": "peer-b"}))
+                resp_b = json.loads(await ws_b.recv())
+                assert resp_b["id"] == "peer-b"
+
+                # Enviar señalización de A hacia B
+                await ws_a.send(json.dumps({"t": "senalar", "para": "peer-b", "datos": {"tipo": "ice", "candidato": "c1"}}))
+                
+                # Consumir mensajes en B hasta recibir 'senalar' (ignorando broadcast de 'nodos')
+                recibido_b = None
+                while True:
+                    m = json.loads(await asyncio.wait_for(ws_b.recv(), 3))
+                    if m.get("t") == "senalar":
+                        recibido_b = m
+                        break
+                assert recibido_b["t"] == "senalar"
+                assert recibido_b["de"] == "peer-a"
+                assert recibido_b["datos"]["candidato"] == "c1"
+
+                # Enviar a destino inexistente produce error
+                await ws_a.send(json.dumps({"t": "senalar", "para": "fantasma", "datos": {"x": 1}}))
+                recibido_err = None
+                while True:
+                    m = json.loads(await asyncio.wait_for(ws_a.recv(), 3))
+                    if m.get("t") == "error":
+                        recibido_err = m
+                        break
+                assert recibido_err["t"] == "error"
+                assert recibido_err["mensaje"] == "destino_no_encontrado"
+
+    asyncio.run(caso())
+
