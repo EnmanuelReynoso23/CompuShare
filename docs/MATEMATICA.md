@@ -115,7 +115,11 @@ Revisando al azar el 2 % de las pasadas, un nodo que corrompe el 10 % de sus res
 
 ## 4. Qué dice la cuenta (ordenado por ganancia)
 
-1. **Bajar los bytes por palabra es lo primero.** Con 315 KB por palabra y 10 Mb/s de subida, el 27B va a
+1. **Bajar los bytes por palabra es lo primero.** Primer hallazgo (4-nov, `fabric/perfiles/salida/RESULTADO.md`):
+   si el maestro no tiene GPU, llama.cpp deja la tabla de salida en el trabajador y en cada palabra vuelven
+   las probabilidades de todo el vocabulario (993 KB en Qwen3.5). Con `fabric.reparto.salida_en_el_maestro()`
+   bajan solo 4,1 KB (la activación): 64 veces menos en total, unos 800 ms menos por palabra con 10 Mb/s.
+   Ya está en el nodo de Kaggle. Lo que sigue: con 315 KB por palabra y 10 Mb/s de subida, el 27B va a
    2,8 palabras/s; solo con la activación, a 7,2 (2,6 veces). Con varias preguntas a la vez la diferencia
    crece. Hay que medir qué viaja en cada palabra por comando RPC (tarea de A4) y lograr que el grafo se
    reutilice. Luego: activación en f16 en vez de f32 (la mitad) y comprimir lo que se repite.
