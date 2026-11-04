@@ -1,0 +1,33 @@
+{
+  "fecha": "2026-11-04T13:49:48.636092+00:00",
+  "sistema": {
+    "os": "Linux",
+    "kernel": "7.2.8-2-cachyos",
+    "maquina": "x86_64",
+    "python": "3.12.15"
+  },
+  "parametros": {
+    "iteraciones_rtt": 500,
+    "bytes_caudal": 104857600,
+    "tamano_bloque": 65536
+  },
+  "directo": {
+    "rtt_min_ms": 0.0182,
+    "rtt_prom_ms": 0.0215,
+    "rtt_max_ms": 0.0528,
+    "caudal_mb_s": 1098.83,
+    "duracion_caudal_s": 0.091
+  },
+  "proxy": {
+    "rtt_min_ms": 0.0238,
+    "rtt_prom_ms": 0.0264,
+    "rtt_max_ms": 0.0486,
+    "caudal_mb_s": 472.64,
+    "duracion_caudal_s": 0.2116
+  },
+  "costo_propio": {
+    "rtt_extra_ms": 0.0049,
+    "caudal_maximo_mb_s": 472.64,
+    "rendimiento_relativo_pct": 43.01
+  }
+}
