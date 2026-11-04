@@ -9,7 +9,12 @@ from pathlib import Path
 
 from fabric.pruebas.test_red import CLAVE, red
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "engine"))
+import pytest  # noqa: E402
+
+_ENGINE = Path(__file__).resolve().parents[2] / "engine"
+if not (_ENGINE / "red.py").exists():
+    pytest.skip("engine/red.py es de SynRAG; esta prueba corre en el repo de SynRAG", allow_module_level=True)
+sys.path.insert(0, str(_ENGINE))
 import red as red_fabric  # noqa: E402
 
 
