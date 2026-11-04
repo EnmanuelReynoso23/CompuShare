@@ -1,15 +1,22 @@
-"""CLI de CompuShare - La Computadora Compartida.
-Permite iniciar el relé maestro, unirse como nodo trabajador,
-consultar el estado del enjambre y probar inferencia distribuida.
+"""Interfaz de linea de comandos (CLI) de CompuShare.
+Permite inspeccionar hardware local, unirse a la red como trabajador aportando computo,
+iniciar el nodo maestro para servir inferencia distribuida compatible con OpenAI,
+y calcular estimaciones de rendimiento matematico.
 """
+
+from __future__ import annotations
 
 import asyncio
 import json
 import logging
+import signal
+import os
+import shutil
+import subprocess
 import sys
-from typing import Optional
+from pathlib import Path
+from typing import Any, Optional
 
-# Asegurar codificación UTF-8 en consolas Windows
 if sys.platform == "win32":
     try:
         sys.stdout.reconfigure(encoding="utf-8")
@@ -17,205 +24,446 @@ if sys.platform == "win32":
     except Exception:
         pass
 
-import aiohttp
+import httpx
 import typer
 from rich.console import Console
-from rich.panel import Panel
 from rich.table import Table
 
 from compushare.nodo.maestro import NodoMaestro
-from compushare.nodo.trabajador import NodoTrabajador, detectar_hardware
+from compushare.nodo.trabajador import NodoTrabajador, buscar_binario
+from fabric import calculo, escenarios
 
 app = typer.Typer(
     name="compushare",
-    help="CompuShare: Red Distribuida de Cómputo e Inferencia de Inteligencia Artificial",
+    help="CompuShare: La Computadora Compartida - Red distribuida de IA",
     add_completion=False,
 )
-console = Console(highlight=False)
+console = Console()
+err_console = Console(stderr=True)
 
 
-def configurar_logging(verbose: bool = False):
-    nivel = logging.DEBUG if verbose else logging.INFO
-    logging.basicConfig(
-        level=nivel,
-        format="%(asctime)s [%(levelname)s] %(message)s",
-        datefmt="%H:%M:%S",
-    )
+@app.callback()
+def _principal(detalle: bool = typer.Option(True, "--detalle/--silencio", help="Mostrar el registro de lo que hace cada nodo")) -> None:
+    """CompuShare: La Computadora Compartida - Red distribuida de IA"""
+    # Sin esto los log.info de fabric y de los nodos (tubos elegidos, comando de llama-server) no salian.
+    logging.basicConfig(level=logging.INFO if detalle else logging.WARNING, format="%(asctime)s %(name)s: %(message)s", datefmt="%H:%M:%S")
+    for ruidoso in ("websockets", "httpx", "httpcore"):
+        logging.getLogger(ruidoso).setLevel(logging.WARNING)
+    # SIGTERM (systemd, kill) pasa por el mismo camino que Ctrl+C: el finally de cada comando detiene los hijos.
+    signal.signal(signal.SIGTERM, _sigterm)
 
 
-@app.command()
-def servir(
-    host: str = typer.Option("0.0.0.0", "--host", "-h", help="Dirección IP de escucha"),
-    puerto: int = typer.Option(8000, "--puerto", "-p", help="Puerto HTTP y WebSocket"),
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Modo detallado de depuración"),
-):
-    """Inicia el Relé Maestro (Orquestador + API OpenAI en /v1/chat/completions)."""
-    configurar_logging(verbose)
-    
-    panel = Panel.fit(
-        f"[bold cyan]CompuShare - Relé Maestro[/bold cyan]\n"
-        f"[green]Dashboard web:[/green] http://{host}:{puerto}/\n"
-        f"[green]Endpoint OpenAI:[/green] http://{host}:{puerto}/v1/chat/completions\n"
-        f"[green]Modelos:[/green] http://{host}:{puerto}/v1/models\n"
-        f"[green]WebSocket Workers:[/green] ws://{host}:{puerto}/ws/worker\n\n"
-        f"[dim]Presiona Ctrl+C para detener el servicio.[/dim]",
-        title="[bold yellow]Servidor Activo[/bold yellow]",
-        border_style="cyan",
-    )
-    console.print(panel)
+def _sigterm(_num, _marco) -> None:
+    raise KeyboardInterrupt
 
-    maestro = NodoMaestro(host=host, puerto=puerto)
+
+def resolver_clave(clave_param: str = "", clave_archivo: Optional[Path] = None) -> str:
+    """Resuelve la clave de autenticacion sin imprimirla nunca en consola ni en logs."""
+    if clave_param:
+        return clave_param
+    env_clave = os.environ.get("FABRIC_CLAVE")
+    if env_clave:
+        return env_clave
+    if clave_archivo and clave_archivo.is_file():
+        try:
+            return clave_archivo.read_text(encoding="utf-8").strip()
+        except Exception:
+            pass
+    config_env = Path.home() / ".config/synrag/fabric.env"
+    if config_env.is_file():
+        try:
+            for linea in config_env.read_text(encoding="utf-8").splitlines():
+                linea = linea.strip()
+                if linea.startswith("FABRIC_CLAVE="):
+                    val = linea.split("=", 1)[1].strip().strip('"').strip("'")
+                    if val:
+                        return val
+        except Exception:
+            pass
+    return ""
+
+
+def obtener_info_gpus() -> list[dict[str, Any]]:
+    """Consulta informacion de GPUs locales mediante nvidia-smi."""
+    gpus: list[dict[str, Any]] = []
     try:
-        asyncio.run(maestro.iniciar())
-    except KeyboardInterrupt:
-        console.print("\n[yellow]Deteniendo Relé Maestro...[/yellow]")
-        asyncio.run(maestro.detener())
-        console.print("[green]Relé detenido con éxito.[/green]")
+        r = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name,memory.total,memory.free", "--format=csv,noheader,nounits"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=5,
+        )
+        for linea in r.stdout.splitlines():
+            linea = linea.strip()
+            if not linea:
+                continue
+            partes = [p.strip() for p in linea.split(",")]
+            if len(partes) >= 3:
+                nombre = partes[0]
+                total_mb = float(partes[1])
+                libre_mb = float(partes[2])
+                gpus.append(
+                    {
+                        "nombre": nombre,
+                        "total_gb": round(total_mb / 1024.0, 2),
+                        "libre_gb": round(libre_mb / 1024.0, 2),
+                    }
+                )
+    except Exception:
+        pass
+    return gpus
 
 
-@app.command()
-def unirse(
-    rele: str = typer.Option("ws://127.0.0.1:8000/ws/worker", "--rele", "-r", help="URL del Relé Maestro"),
-    modelo: str = typer.Option("qwen2.5-coder", "--modelo", "-m", help="Identificador del modelo a servir"),
-    backend: str = typer.Option(
-        "simulado",
-        "--backend",
-        "-b",
-        help="Motor de inferencia: 'llama.cpp', 'ollama', 'vllm' o 'simulado'",
-    ),
-    backend_url: Optional[str] = typer.Option(None, "--backend-url", help="URL del backend local (ej. http://127.0.0.1:8080)"),
-    worker_id: Optional[str] = typer.Option(None, "--id", help="Identificador único del trabajador"),
-    slots: int = typer.Option(2, "--slots", "-s", help="Cantidad de tareas concurrentes soportadas"),
-    tps: float = typer.Option(30.0, "--tps", help="Tokens por segundo estimados"),
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Modo detallado"),
-):
-    """Conecta este equipo o instancia a la red CompuShare como Nodo Trabajador."""
-    configurar_logging(verbose)
-    gpu, vram = detectar_hardware()
+def obtener_info_ram() -> dict[str, float]:
+    """Lee memoria RAM del sistema operativo."""
+    ram = {"total_gb": 0.0, "disponible_gb": 0.0}
+    try:
+        with open("/proc/meminfo", "r", encoding="utf-8") as f:
+            for linea in f:
+                if linea.startswith("MemTotal:"):
+                    ram["total_gb"] = round(float(linea.split()[1]) / 1e6, 2)
+                elif linea.startswith("MemAvailable:"):
+                    ram["disponible_gb"] = round(float(linea.split()[1]) / 1e6, 2)
+    except Exception:
+        pass
+    return ram
 
-    panel = Panel.fit(
-        f"[bold green]Conectando Trabajador al Enjambre CompuShare[/bold green]\n"
-        f"Relé destino: [cyan]{rele}[/cyan]\n"
-        f"Modelo: [yellow]{modelo}[/yellow]\n"
-        f"Backend: [magenta]{backend}[/magenta]\n"
-        f"Hardware detectado: [bold white]{gpu}[/bold white] ({vram} MB VRAM)\n"
-        f"Slots concurrentes: [white]{slots}[/white]",
-        title="[bold green]Nodo Trabajador[/bold green]",
-        border_style="green",
-    )
-    console.print(panel)
 
-    trabajador = NodoTrabajador(
-        rele_url=rele,
-        modelo=modelo,
-        backend=backend,
-        backend_url=backend_url,
-        worker_id=worker_id,
-        max_slots=slots,
-        tokens_per_second=tps,
-    )
+def medir_banda_memoria(
+    llama_bin: Optional[str] = None,
+    modelo_ruta: Optional[Path] = None,
+) -> Optional[dict[str, Any]]:
+    """Mide ancho de banda de memoria efectivo ejecutando llama-bench bajo medir.lock."""
+    try:
+        bin_bench = buscar_binario("llama-bench", llama_bin)
+    except FileNotFoundError:
+        return None
+
+    modelo_a_usar = modelo_ruta
+    if modelo_a_usar is None or not modelo_a_usar.is_file():
+        carpeta_modelos = Path.home() / ".cache/fabric-descargas/modelos"
+        candidatos = list(carpeta_modelos.glob("*.gguf"))
+        if candidatos:
+            candidatos.sort(key=lambda p: p.stat().st_size)
+            modelo_a_usar = candidatos[0]
+
+    if modelo_a_usar is None or not modelo_a_usar.is_file():
+        return None
+
+    cmd = [
+        str(bin_bench),
+        "-m",
+        str(modelo_a_usar),
+        "-n",
+        "8",
+        "-p",
+        "8",
+        "-r",
+        "1",
+        "-o",
+        "json",
+    ]
+
+    lock_file = "/home/reyno/Proyectos/cs-agentes/medir.lock"
+    cmd_completo = ["flock", lock_file] + cmd if shutil.which("flock") and os.path.exists(os.path.dirname(lock_file)) else cmd
 
     try:
-        asyncio.run(trabajador.conectar())
-    except KeyboardInterrupt:
-        console.print("\n[yellow]Desconectando trabajador...[/yellow]")
-        asyncio.run(trabajador.detener())
-        console.print("[green]Trabajador desconectado limpiamente.[/green]")
-
-
-@app.command()
-def probar(
-    url: str = typer.Option("http://127.0.0.1:8000", "--url", "-u", help="URL base del Relé Maestro"),
-    modelo: str = typer.Option("qwen2.5-coder", "--modelo", "-m", help="Nombre del modelo a invocar"),
-    prompt: str = typer.Option("¿Qué es CompuShare y cómo funciona?", "--prompt", "-p", help="Prompt para la inferencia"),
-    stream: bool = typer.Option(True, "--stream/--no-stream", help="Activar streaming token a token"),
-):
-    """Envía una consulta de prueba al Relé Maestro mediante la API OpenAI."""
-    async def _test():
-        endpoint = f"{url.rstrip('/')}/v1/chat/completions"
-        payload = {
-            "model": modelo,
-            "messages": [{"role": "user", "content": prompt}],
-            "stream": stream,
-        }
-
-        console.print(f"[bold cyan]Enviando prompt a:[/bold cyan] {endpoint}")
-        console.print(f"[bold yellow]Modelo:[/bold yellow] {modelo}")
-        console.print(f"[bold green]Prompt:[/bold green] {prompt}\n")
-        console.print("-" * 60)
-
-        async with aiohttp.ClientSession() as session:
-            try:
-                async with session.post(endpoint, json=payload, timeout=aiohttp.ClientTimeout(total=60)) as resp:
-                    if resp.status != 200:
-                        error_text = await resp.text()
-                        console.print(f"[bold red]Error HTTP {resp.status}:[/bold red] {error_text}")
-                        return
-
-                    if stream:
-                        async for linea in resp.content:
-                            linea_str = linea.decode("utf-8").strip()
-                            if not linea_str:
-                                continue
-                            if linea_str.startswith("data: "):
-                                data_part = linea_str[6:].strip()
-                                if data_part == "[DONE]":
-                                    break
-                                try:
-                                    chunk = json.loads(data_part)
-                                    delta = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
-                                    if delta:
-                                        sys.stdout.write(delta)
-                                        sys.stdout.flush()
-                                except Exception:
-                                    pass
-                        sys.stdout.write("\n")
-                    else:
-                        data = await resp.json()
-                        contenido = data.get("choices", [{}])[0].get("message", {}).get("content", "")
-                        console.print(contenido)
-
-                console.print("-" * 60)
-                console.print("[bold green]Inferencia completada con éxito vía CompuShare Swarm.[/bold green]")
-            except Exception as e:
-                console.print(f"[bold red]Error al conectar con el relé:[/bold red] {e}")
-
-    asyncio.run(_test())
+        r = subprocess.run(cmd_completo, capture_output=True, text=True, check=True, timeout=30)
+        datos = json.loads(r.stdout)
+        for item in datos:
+            if item.get("n_gen", 0) > 0:
+                avg_ts = float(item.get("avg_ts", 0.0))
+                tam_modelo = float(item.get("model_size", 0.0))
+                banda_gbs = round((avg_ts * tam_modelo) / 1e9, 2)
+                return {
+                    "banda_gbs": banda_gbs,
+                    "tok_s": round(avg_ts, 2),
+                    "modelo": modelo_a_usar.name,
+                }
+    except Exception:
+        pass
+    return None
 
 
 @app.command()
 def info(
-    url: Optional[str] = typer.Option(None, "--url", "-u", help="URL del Relé Maestro para consultar estado de la red"),
+    llama_bin: Optional[str] = typer.Option(None, help="Directorio con binarios de llama.cpp"),
+    modelo: Optional[Path] = typer.Option(None, help="Modelo GGUF para medir ancho de banda con llama-bench"),
+    medir_banda: bool = typer.Option(True, help="Ejecutar medicion de ancho de banda si llama-bench esta disponible"),
 ):
-    """Muestra información sobre el hardware local y el estado de la red CompuShare."""
-    console.print("[bold cyan]CompuShare: La Computadora Compartida[/bold cyan]")
-    gpu, vram = detectar_hardware()
-    
-    t_hw = Table(title="Hardware Local", show_header=True)
-    t_hw.add_column("Propiedad", style="yellow")
-    t_hw.add_column("Valor", style="white")
-    t_hw.add_row("Acelerador / GPU", gpu)
-    t_hw.add_row("VRAM Total", f"{vram} MB" if vram else "N/A (CPU)")
-    console.print(t_hw)
+    """Muestra equipos de esta maquina (GPU, VRAM, RAM, ancho de banda) y modelos compatibles."""
+    console.print("[bold]Informacion de Recursos Locales - CompuShare[/bold]\n")
 
-    if url:
-        async def _consultar_red():
-            async with aiohttp.ClientSession() as session:
+    gpus = obtener_info_gpus()
+    ram = obtener_info_ram()
+
+    tabla_hw = Table(title="Hardware Local", show_header=True, header_style="bold")
+    tabla_hw.add_column("Componente", style="cyan")
+    tabla_hw.add_column("Detalle")
+    tabla_hw.add_column("Capacidad Total")
+    tabla_hw.add_column("Disponible / Libre")
+
+    if gpus:
+        for i, g in enumerate(gpus):
+            tabla_hw.add_row(f"GPU {i}", g["nombre"], f"{g['total_gb']} GB VRAM", f"{g['libre_gb']} GB VRAM")
+    else:
+        tabla_hw.add_row("GPU", "No se detecto GPU NVIDIA via nvidia-smi", "0.0 GB", "0.0 GB")
+
+    tabla_hw.add_row(
+        "RAM",
+        "Memoria del Sistema",
+        f"{ram['total_gb']} GB" if ram["total_gb"] > 0 else "No detectado",
+        f"{ram['disponible_gb']} GB" if ram["disponible_gb"] > 0 else "No detectado",
+    )
+
+    console.print(tabla_hw)
+    console.print()
+
+    vram_total = sum(g["total_gb"] for g in gpus)
+    mem_total_local = vram_total if vram_total > 0 else ram["disponible_gb"]
+
+    if medir_banda:
+        res_banda = medir_banda_memoria(llama_bin, modelo)
+        if res_banda:
+            console.print(
+                f"[bold green]Ancho de banda de memoria medido:[/bold green] {res_banda['banda_gbs']} GB/s "
+                f"(a {res_banda['tok_s']} tok/s evaluado con {res_banda['modelo']})\n"
+            )
+        else:
+            console.print("[yellow]Medicion de ancho de banda con llama-bench no realizada (modelo o binario ausente)[/yellow]\n")
+
+    modelos_estandar = [
+        calculo.Modelo("Qwen3.5-0.8B Q8_0", 0.81, capas=24, d_modelo=1024),
+        calculo.QWEN35_9B_Q8,
+        calculo.QWEN38_27B_Q4,
+        calculo.QWEN36_35B_A3B_Q4,
+    ]
+
+    tabla_mod = Table(title="Compatibilidad de Modelos (fabric/calculo.py)", show_header=True, header_style="bold")
+    tabla_mod.add_column("Modelo", style="cyan", no_wrap=True)
+    tabla_mod.add_column("Pesos GGUF")
+    tabla_mod.add_column("Memoria Requerida (4K ctx)")
+    tabla_mod.add_column("¿Cabe en VRAM?")
+    tabla_mod.add_column("¿Cabe en RAM/CPU?")
+    tabla_mod.add_column("¿Requiere Red?")
+
+    for m in modelos_estandar:
+        req = calculo.memoria_necesaria_gb(m, contexto=4096, flujos=1)
+        cabe_vram = "[green]Si[/green]" if vram_total >= req else "[red]No[/red]"
+        cabe_ram = "[green]Si[/green]" if ram["disponible_gb"] >= req else "[red]No[/red]"
+        requiere_red = "[red]Si[/red]" if (vram_total < req and ram["disponible_gb"] < req) else "[green]No[/green]"
+
+        tabla_mod.add_row(
+            m.nombre,
+            f"{m.pesos_gb:.2f} GB",
+            f"{req:.2f} GB",
+            cabe_vram,
+            cabe_ram,
+            requiere_red,
+        )
+
+    console.print(tabla_mod)
+
+
+@app.command()
+def unirse(
+    rele: str = typer.Option(
+        os.environ.get("FABRIC_RELE", "ws://127.0.0.1:59095"),
+        help="URL del rele de coordinacion",
+    ),
+    clave: str = typer.Option("", help="Clave secreta del rele (opcional si se define en entorno o archivo)"),
+    clave_archivo: Optional[Path] = typer.Option(None, help="Ruta al archivo con la clave secreta"),
+    nombre: str = typer.Option("", help="Nombre identificador de este trabajador"),
+    puerto_rpc: int = typer.Option(59052, help="Puerto local para ggml-rpc-server en 127.0.0.1"),
+    vram_gb: float = typer.Option(0.0, help="Memoria VRAM que presta (0 para autodeteccion)"),
+    llama_bin: Optional[str] = typer.Option(None, help="Directorio con binarios de llama.cpp"),
+    threads: int = typer.Option(4, help="Hilos de CPU para el servidor RPC (maximo 6)"),
+    cache: bool = typer.Option(False, help="Habilitar cache local de archivos en ggml-rpc-server"),
+    duracion: float = typer.Option(0.0, help="Segundos tras los cuales salir (0 para infinito)"),
+):
+    """Conecta esta maquina a la red CompuShare como trabajador de computo."""
+    clave_res = resolver_clave(clave, clave_archivo)
+    if not clave_res:
+        err_console.print("Error: No se especifico la clave. Usa --clave, --clave-archivo o define FABRIC_CLAVE.")
+        raise typer.Exit(code=1)
+
+    console.print(f"[bold green]Uniendo equipo a la red CompuShare[/bold green]")
+    console.print(f"Rele: {rele}")
+    console.print(f"Servidor RPC local: 127.0.0.1:{puerto_rpc} (hilos: {min(6, max(1, threads))})")
+
+    nodo = NodoTrabajador(
+        rele_url=rele,
+        clave=clave_res,
+        nombre=nombre,
+        puerto_rpc=puerto_rpc,
+        vram_gb=vram_gb,
+        llama_bin=llama_bin,
+        threads=threads,
+        cache=cache,
+    )
+
+    try:
+        asyncio.run(nodo.conectar(duracion=duracion))
+    except KeyboardInterrupt:
+        console.print("\nDesconexion solicitada por el usuario.")
+    finally:
+        nodo.detener()
+    console.print("Trabajador finalizado.")
+
+
+@app.command()
+def servir(
+    modelo: Path = typer.Option(..., help="Ruta al archivo GGUF del modelo a servir"),
+    rele: str = typer.Option("ws://127.0.0.1:59095", help="URL del rele de coordinacion"),
+    clave: str = typer.Option("", help="Clave secreta del rele (opcional si se define en entorno o archivo)"),
+    clave_archivo: Optional[Path] = typer.Option(None, help="Ruta al archivo con la clave secreta"),
+    puerto: int = typer.Option(59000, help="Puerto para exponer la API compatible con OpenAI en 127.0.0.1"),
+    puerto_rele: Optional[int] = typer.Option(None, help="Puerto para el rele local (si se inicia)"),
+    iniciar_rele: bool = typer.Option(True, help="Iniciar servidor de rele local si no existe"),
+    llama_bin: Optional[str] = typer.Option(None, help="Directorio con binarios de llama.cpp"),
+    espera_trabajadores: float = typer.Option(3.0, help="Segundos para esperar conexion de trabajadores"),
+    min_trabajadores: int = typer.Option(0, help="Minimo de trabajadores requeridos para distribuir"),
+    threads: int = typer.Option(4, help="Hilos de CPU para llama-server (maximo 6)"),
+    ctx_size: int = typer.Option(4096, help="Tamano del contexto en tokens"),
+    duracion: float = typer.Option(0.0, help="Segundos tras los cuales salir (0 para infinito)"),
+):
+    """Inicia el nodo maestro: orquesta trabajadores y sirve API OpenAI en 127.0.0.1."""
+    if not modelo.is_file():
+        err_console.print(f"Error: El archivo de modelo no existe: {modelo}")
+        raise typer.Exit(code=1)
+
+    clave_res = resolver_clave(clave, clave_archivo)
+    if not clave_res:
+        err_console.print("Error: No se especifico la clave. Usa --clave, --clave-archivo o define FABRIC_CLAVE.")
+        raise typer.Exit(code=1)
+
+    console.print("[bold green]Iniciando Nodo Maestro CompuShare[/bold green]")
+    console.print(f"Modelo: {modelo}")
+    console.print(f"Puerto API OpenAI: 127.0.0.1:{puerto}")
+    console.print(f"Rele: {rele}")
+
+    maestro = NodoMaestro(
+        modelo=modelo,
+        rele_url=rele,
+        clave=clave_res,
+        puerto_openai=puerto,
+        puerto_rele=puerto_rele,
+        iniciar_rele_local=iniciar_rele,
+        llama_bin=llama_bin,
+        espera_trabajadores=espera_trabajadores,
+        min_trabajadores=min_trabajadores,
+        threads=threads,
+        ctx_size=ctx_size,
+    )
+
+    try:
+        asyncio.run(maestro.iniciar(duracion=duracion))
+    except KeyboardInterrupt:
+        console.print("\nServicio detenido por el usuario.")
+    finally:
+        maestro.detener()
+    console.print("Servidor maestro finalizado.")
+
+
+@app.command()
+def calcular(
+    rtt_ms: float = typer.Option(40.0, help="Ida y vuelta promedio en milisegundos"),
+    subida_mbps: float = typer.Option(10.0, help="Velocidad de subida en Mb/s"),
+    modelo: Optional[str] = typer.Option(None, help="Filtrar por modelo especifico (27b, 35b, 9b)"),
+):
+    """Imprime los escenarios matematicos de fabric/escenarios.py para los parametros dados."""
+    console.print(f"[bold]Calculo de Escenarios Distribuidos (RTT: {rtt_ms} ms, Subida: {subida_mbps} Mb/s)[/bold]\n")
+
+    if rtt_ms == 40.0 and subida_mbps == 10.0 and modelo is None:
+        escenarios.main()
+        return
+
+    maestro, cands = escenarios.amigos(rtt=rtt_ms, subida=subida_mbps)
+    modelos = [escenarios.QWEN38_27B, escenarios.MOE_35B_A3B]
+    if modelo:
+        mod_l = modelo.lower()
+        if "27" in mod_l:
+            modelos = [escenarios.QWEN38_27B]
+        elif "35" in mod_l:
+            modelos = [escenarios.MOE_35B_A3B]
+
+    hdr = "| Equipos:capas | ms calculo | ms red | ms por pasada | palabras/s por pregunta | palabras/s total | Caso |"
+    sep = "|---|---|---|---|---|---|---|"
+
+    for m in modelos:
+        console.print(f"## {m.nombre} (RTT {rtt_ms} ms, subida {subida_mbps} Mb/s)\n")
+        console.print(hdr)
+        console.print(sep)
+        for etiqueta, bpp in (
+            ("grafo reenviado (315 KB, medido)", calculo.BYTES_POR_PALABRA_MEDIDO),
+            ("solo activacion (grafo reutilizado)", None),
+        ):
+            for flujos in (1, 4, 8):
                 try:
-                    async with session.get(f"{url.rstrip('/')}/api/status", timeout=aiohttp.ClientTimeout(total=5)) as resp:
-                        if resp.status == 200:
-                            data = await resp.json()
-                            console.print(f"\n[bold green]Estado de la Red CompuShare ({url}):[/bold green]")
-                            console.print(f"Nodos activos: [cyan]{data.get('nodos_activos')}[/cyan]")
-                            console.print(f"Slots totales: [cyan]{data.get('slots_totales')}[/cyan]")
-                            console.print(f"Tareas completadas: [cyan]{data.get('tareas_completadas')}[/cyan]")
-                            console.print(f"Modelos disponibles: [yellow]{', '.join(data.get('modelos_disponibles', [])) or 'Ninguno'}[/yellow]")
-                        else:
-                            console.print(f"[red]Error consultando el relé: HTTP {resp.status}[/red]")
-                except Exception as e:
-                    console.print(f"[red]No se pudo conectar con el relé en {url}: {e}[/red]")
+                    r = calculo.elegir_optimo(m, maestro, cands, bpp, flujos)
+                    console.print(escenarios.fila(r, f" {etiqueta}, {flujos} flujos |"))
+                except ValueError:
+                    console.print(f"| no cabe | | | | | | {etiqueta}, {flujos} flujos |")
+        console.print()
 
-        asyncio.run(_consultar_red())
+
+@app.command()
+def probar(
+    url: str = typer.Option("http://127.0.0.1:59000", "--url", "-u", help="URL base del servidor OpenAI"),
+    modelo: str = typer.Option("local", "--modelo", "-m", help="Nombre del modelo a invocar"),
+    prompt: str = typer.Option("Explica en dos frases que es la computacion distribuida.", "--prompt", "-p", help="Prompt para la inferencia"),
+    stream: bool = typer.Option(True, "--stream/--no-stream", help="Activar streaming token a token"),
+):
+    """Envia una consulta de prueba al servidor OpenAI local o distribuido."""
+    endpoint = f"{url.rstrip('/')}/v1/chat/completions"
+    payload = {
+        "model": modelo,
+        "messages": [{"role": "user", "content": prompt}],
+        "stream": stream,
+    }
+
+    console.print(f"[bold cyan]Enviando prompt a:[/bold cyan] {endpoint}")
+    console.print(f"[bold yellow]Modelo:[/bold yellow] {modelo}")
+    console.print(f"[bold green]Prompt:[/bold green] {prompt}\n")
+    console.print("-" * 60)
+
+    try:
+        if stream:
+            with httpx.Client(timeout=120) as client:
+                with client.stream("POST", endpoint, json=payload) as resp:
+                    if resp.status_code != 200:
+                        err_console.print(f"Error HTTP {resp.status_code}: {resp.read().decode('utf-8', errors='replace')}")
+                        return
+                    for linea in resp.iter_lines():
+                        if not linea or not linea.startswith("data:"):
+                            continue
+                        data_part = linea[5:].strip()
+                        if data_part == "[DONE]":
+                            break
+                        try:
+                            chunk = json.loads(data_part)
+                            delta = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                            if delta:
+                                sys.stdout.write(delta)
+                                sys.stdout.flush()
+                        except Exception:
+                            pass
+                    sys.stdout.write("\n")
+        else:
+            with httpx.Client(timeout=120) as client:
+                resp = client.post(endpoint, json=payload)
+                if resp.status_code != 200:
+                    err_console.print(f"Error HTTP {resp.status_code}: {resp.text}")
+                    return
+                data = resp.json()
+                contenido = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                console.print(contenido)
+
+        console.print("-" * 60)
+        console.print("[bold green]Inferencia completada con exito.[/bold green]")
+    except Exception as e:
+        err_console.print(f"Error al conectar con el servidor: {e}")
 
 
 if __name__ == "__main__":
