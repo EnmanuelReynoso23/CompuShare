@@ -1,0 +1,7 @@
+# Normalizar saltos de línea para compatibilidad entre Windows, Linux y Mac
+* text=auto eol=lf
+
+# Configuración de GitHub Linguist
+fabric/kaggle/resultados/** linguist-documentation
+docs/** linguist-documentation
+*.svg binary
