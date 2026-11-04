@@ -92,9 +92,10 @@ def test_resolver_clave(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     assert resolver_clave(clave_archivo=archivo) == "clave_en_archivo"
 
 
-def test_cli_unirse_sin_clave(monkeypatch: pytest.MonkeyPatch):
+def test_cli_unirse_sin_clave(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """Verifica que unirse falle limpiamente si falta la clave."""
     monkeypatch.delenv("FABRIC_CLAVE", raising=False)
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
     resultado = runner.invoke(app, ["unirse"])
     assert resultado.exit_code == 1
     assert "Error: No se especifico la clave" in resultado.output
@@ -226,18 +227,20 @@ def test_nodo_maestro_construir_comando(tmp_path: Path):
 def test_extraer_modelo_info(tmp_path: Path):
     """Verifica la extraccion de metadatos de modelos conocidos y genericos."""
     m_08b = tmp_path / "Qwen3.5-0.8B-Q8_0.gguf"
-    _archivo_disperso(m_08b, 800_000_000)
-    info_08b = extraer_modelo_info(m_08b)
-    assert info_08b.capas == 24
-    assert info_08b.d_modelo == 1024
-    assert round(info_08b.pesos_gb, 1) == 0.8
+    m_08b.write_bytes(b"GGUF")
+    with patch.object(Path, "stat", return_value=MagicMock(st_size=800_000_000)):
+        info_08b = extraer_modelo_info(m_08b)
+        assert info_08b.capas == 24
+        assert info_08b.d_modelo == 1024
+        assert round(info_08b.pesos_gb, 1) == 0.8
 
     m_27b = tmp_path / "Qwen3.8-27B-UD-Q4.gguf"
-    _archivo_disperso(m_27b, 16_500_000_000)
-    info_27b = extraer_modelo_info(m_27b)
-    assert info_27b.capas == 64
-    assert info_27b.d_modelo == 5120
-    assert round(info_27b.pesos_gb, 1) == 16.5
+    m_27b.write_bytes(b"GGUF")
+    with patch.object(Path, "stat", return_value=MagicMock(st_size=16_500_000_000)):
+        info_27b = extraer_modelo_info(m_27b)
+        assert info_27b.capas == 64
+        assert info_27b.d_modelo == 5120
+        assert round(info_27b.pesos_gb, 1) == 16.5
 
 
 def test_contar_gpus_locales_usa_lo_que_ve_llama_cpp():

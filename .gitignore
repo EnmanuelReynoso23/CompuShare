@@ -59,5 +59,9 @@ go/dist/
 .DS_Store
 Thumbs.db
 
+# Large datasets and models
+data/
+*.gguf
+
 # Tests
 .pytest_cache/

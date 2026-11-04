@@ -2,8 +2,71 @@ import asyncio
 import json
 import pytest
 import aiohttp
+from websockets.asyncio.client import connect
 from compushare.rele.servidor import ServidorRele
-from compushare.nodo.trabajador import NodoTrabajador
+from compushare.protocolo import (
+    TipoMensaje,
+    MensajeRegistro,
+    MensajeInferenciaReq,
+    MensajeInferenciaChunk,
+    MensajeInferenciaFin,
+    serializar_mensaje,
+    deserializar_mensaje,
+)
+
+
+class WorkerSimulado:
+    def __init__(self, url: str, worker_id: str, modelo: str):
+        self.url = url
+        self.worker_id = worker_id
+        self.modelo = modelo
+        self._ws = None
+        self._corriendo = False
+
+    async def conectar(self):
+        self._corriendo = True
+        self._ws = await connect(self.url)
+        # Registro
+        reg = MensajeRegistro(
+            worker_id=self.worker_id,
+            modelo=self.modelo,
+            max_slots=2,
+            vram_mb=8192,
+            tokens_per_second=30.0,
+        )
+        await self._ws.send(serializar_mensaje(reg))
+
+        try:
+            async for crudo in self._ws:
+                if not self._corriendo:
+                    break
+                msg = deserializar_mensaje(crudo)
+                if isinstance(msg, MensajeInferenciaReq):
+                    # Enviar chunks simulados
+                    texto = "CompuShare Swarm: Inferencia distribuida ejecutada con exito."
+                    palabras = texto.split(" ")
+                    for i, p in enumerate(palabras):
+                        chunk = MensajeInferenciaChunk(
+                            id_tarea=msg.id_tarea,
+                            delta_texto=p + (" " if i < len(palabras) - 1 else ""),
+                            indice=i,
+                        )
+                        await self._ws.send(serializar_mensaje(chunk))
+                        await asyncio.sleep(0.01)
+                    fin = MensajeInferenciaFin(
+                        id_tarea=msg.id_tarea,
+                        prompt_tokens=10,
+                        completion_tokens=len(palabras),
+                        tiempo_total_ms=50.0,
+                    )
+                    await self._ws.send(serializar_mensaje(fin))
+        except Exception:
+            pass
+
+    async def detener(self):
+        self._corriendo = False
+        if self._ws:
+            await self._ws.close()
 
 
 @pytest.mark.asyncio
@@ -12,12 +75,10 @@ async def test_end_to_end_inferencia_distribuida():
     servidor = ServidorRele(host="127.0.0.1", puerto=puerto_test)
     await servidor.iniciar()
 
-    trabajador = NodoTrabajador(
-        rele_url=f"ws://127.0.0.1:{puerto_test}/ws/worker",
-        modelo="qwen2.5-coder-test",
-        backend="simulado",
+    trabajador = WorkerSimulado(
+        url=f"ws://127.0.0.1:{puerto_test}/ws/worker",
         worker_id="test-worker-e2e",
-        max_slots=2,
+        modelo="qwen2.5-coder-test",
     )
     task_worker = asyncio.create_task(trabajador.conectar())
 
@@ -59,7 +120,7 @@ async def test_end_to_end_inferencia_distribuida():
         async with session.post(f"{base_url}/v1/chat/completions", json=payload_stream) as resp:
             assert resp.status == 200
             assert "text/event-stream" in resp.headers.get("Content-Type", "")
-            
+
             chunks_recibidos = []
             async for line in resp.content:
                 line_str = line.decode("utf-8").strip()
