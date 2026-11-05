@@ -34,6 +34,12 @@ def lanzar(cmd: list[str], nombre: str) -> tuple[subprocess.Popen, Path]:
     """Lanza `cmd` con su salida en un archivo de registro. Devuelve el proceso y la ruta del registro."""
     DIR_REGISTROS.mkdir(parents=True, exist_ok=True)
     ruta = DIR_REGISTROS / f"{nombre}.log"
+    if ruta.exists() and ruta.stat().st_size:
+        # Al relanzar tras una caída, el registro anterior explica la caída: no se pisa.
+        try:
+            ruta.replace(ruta.with_suffix(".anterior.log"))
+        except OSError:  # en Windows, si otro proceso todavía lo tiene abierto
+            pass
     with open(ruta, "wb") as salida:
         proc = subprocess.Popen(
             cmd,

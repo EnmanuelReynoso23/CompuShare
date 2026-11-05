@@ -26,11 +26,15 @@ Licencia MIT.
 - **Maestro** (`compushare servir`): espera a los trabajadores, mide el ping de cada uno
   (`fabric/reparto.py`), elige los menos posibles y más cercanos, y arranca `llama-server --rpc` con lo que
   hace falta para que funcione por internet:
-  - la tabla de salida se queda en el maestro (lo que viaja por palabra baja de 993 KB a 4,1 KB);
+  - la tabla de salida se queda en el maestro (lo que viaja por palabra baja de 993 KB a 4,1 KB), con un
+    patrón anclado para que no arrastre la proyección de salida de cada capa de atención;
   - sin puntos de control ni caché de prompts (cada uno costaba una ida y vuelta por la red);
   - decodificación especulativa opcional (`--especulativa ngram-mod` o `draft-mtp`).
 - **Cliente** (`compushare probar`, `compushare transcribir`): habla con `llama-server` por su protocolo
   propio (`/apply-template` y `/completion`).
+- **Caídas**: si a un trabajador se le cae `ggml-rpc-server`, lo relanza en el mismo puerto; si se cae
+  `llama-server`, el maestro vuelve a elegir entre los tubos vivos y lo relanza (`--reinicios`);
+  `transcribir` espera a que vuelva, repite el trozo y con `--retomar` salta lo ya hecho.
 
 Se reparte por **bloques de capas**, nunca cada capa entre dos equipos ni los expertos de un MoE entre
 equipos: por internet eso multiplica las esperas de red (ver `INFORME-A11.md` y `docs/MATEMATICA.md`).
@@ -81,11 +85,21 @@ Toda cifra de esta sección viene de una corrida real. Las predicciones de `fabr
 | --- | --- | --- |
 | Qwen3.5-9B Q8_0 repartido en 2 cuadernos de Kaggle (4 GPU T4), por túnel de Cloudflare (237 ms ida y vuelta) | 6,8-6,9 tok/s; con MTP 10,3-10,8 tok/s | `fabric/kaggle/resultados/20261031-dividido` |
 | Tabla de salida en el maestro | 993 KB a 4,1 KB por palabra | `fabric/reparto.py` |
-| 5 trabajadores en una PC, red simulada a 50 ms de ping y 50 Mb/s, Qwen3.5-0.8B copiando un trozo de La metamorfosis | sin especulativa 1,1 tok/s; con `ngram-mod` 4,9 tok/s (91 % de aciertos); copia exacta | medición local del 4-nov-2026 |
-| Lo mismo con 4 trozos a la vez | 2,77 tok/s en total: peor que 1 trozo con esta versión de llama.cpp | medición local del 4-nov-2026 |
+| 5 trabajadores en una PC, red simulada a 50 ms de ping y 50 Mb/s, Qwen3.5-0.8B copiando el trozo 1 de La metamorfosis, **antes** de anclar el patrón de la tabla de salida | sin especulativa 1,10 tok/s; con `ngram-mod` 3,08 tok/s | medición local del 4-nov-2026 |
+| Lo mismo **después** de anclarlo (`^(token_embd\|output)\.weight$`) | sin especulativa 2,54 tok/s; con `ngram-mod` 4,67 tok/s (76 % de aciertos); misma salida (99,92 %) | medición local del 4-nov-2026 |
+| Qué viaja por enlace y por token (sin especulativa, 2 trabajadores, proxy que lee el protocolo RPC) | antes 707 KB y 4 idas y vueltas; después 13,9 KB y 1 | medición local del 4-nov-2026 |
+| 4 trozos a la vez (antes del arreglo) | 2,77 tok/s en total: peor que 1 trozo con esta versión de llama.cpp | medición local del 4-nov-2026 |
+| Caída de un trabajador a mitad de `transcribir` (se mata su `ggml-rpc-server`) | el trabajador lo relanza en 2 s, el maestro relanza `llama-server` en 4 s; 6 de 6 trozos, 0 errores | prueba local del 4-nov-2026 |
+| Qwen3.5-9B en 2 cuadernos de Kaggle copiando La metamorfosis (antes de los arreglos) | 42 de 93 trozos, 39 exactos, 6,46 tok/s, 88,8 % de aciertos; el túnel cortó los WebSocket en el trozo 43 y el maestro no se recuperó | `fabric/kaggle/resultados/20261104-metamorfosis-antes` |
+| Lo mismo **después** de los arreglos (4 GPU T4, `ngram-mod,draft-mtp`) | **el libro entero: 93 de 93 trozos en 27,4 min**, 0 errores, 90 exactos (los otros 3 cambian comillas), 18,99 tok/s de generación, 233,2 tok/s de lectura, 89,7 % de aciertos; ida y vuelta 37,1 ms (abrir el tubo 667,1 ms); 11,0 MB/s por el tubo | `fabric/kaggle/resultados/20261104-metamorfosis` |
 | Programa completo (`servir` + 2 `unirse` + `transcribir`) en una PC, sin retraso de red, Qwen3.5-0.8B | 3 trozos, 99,93 % de parecido, 1 exacto (el modelo chico cambia comillas y alguna letra) | prueba de punta a punta del 4-nov-2026 |
 
-Pendiente: la misma transcripción en Kaggle con el modelo de 9B (`TRANSCRIBIR=1 python fabric/kaggle/lanzar.py --dividido`).
+El "ping" de Kaggle que se informaba (237 ms el 31-oct, 664 ms el 4-nov) medía abrir un tubo más el saludo
+HELLO, no la ida y vuelta por una conexión abierta. Desde el 4-nov se miden las dos por separado
+(`fabric/reparto.py: medir_enlace`).
+
+Pendiente: con especulativa pasan unos 633 KB por token generado (11,0 MB/s en Kaggle), demasiado para muchas
+conexiones de casa; la recuperación ante caídas está probada en local pero no hubo cortes en la corrida de Kaggle.
 
 ---
 

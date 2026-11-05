@@ -139,6 +139,7 @@ class NodoMaestro:
         paralelo: int = 1,
         especulativa: str = "",
         espera_carga: float = 900.0,
+        max_reinicios: int = 3,
     ) -> None:
         self.modelo = Path(modelo)
         if not self.modelo.is_file():
@@ -169,6 +170,10 @@ class NodoMaestro:
         self.espera_carga = espera_carga
         self.gpus_locales = gpus_locales if gpus_locales is not None else contar_gpus_locales(llama_bin)
 
+        # Si llama-server se cae a mitad de trabajo (se cayó un trabajador), se relanza hasta estas veces.
+        self.max_reinicios = max_reinicios
+        self.reinicios = 0
+        self.espera_recuperar = 600.0
         self.server_proc: subprocess.Popen[Any] | None = None
         self.registro_server: Path | None = None
         self._rele_task: asyncio.Task[Any] | None = None
@@ -227,8 +232,10 @@ class NodoMaestro:
             mapa_puertos[nombre] = puerto
             info = det.get("info", {})
             vram_gb = float(info.get("vram_gb", 4.0)) if info else 4.0
-            rtt = await asyncio.to_thread(reparto.medir_rtt, puerto, "127.0.0.1", 2, 3.0)
-            log.info("Tubo %s (puerto %d): RTT=%.2f ms, VRAM=%.1f GB", nombre, puerto, rtt, vram_gb)
+            medida = await asyncio.to_thread(reparto.medir_enlace, puerto, "127.0.0.1", 5, 10.0)
+            rtt = medida["rtt_ms"]
+            log.info("Tubo %s (puerto %d): ida y vuelta %.2f ms (abrir el tubo %.0f ms), VRAM=%.1f GB",
+                     nombre, puerto, rtt, medida["conexion_ms"], vram_gb)
             candidatos_reparto.append(reparto.Candidato(nombre=nombre, puerto=puerto, vram_gb=vram_gb, rtt_ms=rtt))
             candidatos_calculo.append(
                 calculo.Equipo(
@@ -309,50 +316,74 @@ class NodoMaestro:
             cmd.extend(["--spec-type", self.especulativa])
         return cmd
 
-    async def iniciar(self, duracion: float = 0.0) -> None:
-        """Inicia el rele (si corresponde), selecciona tubos y arranca llama-server."""
-        if self.iniciar_rele_local:
-            await self._iniciar_rele()
-
-        rpc_targets = await self.seleccionar_trabajadores()
+    async def _arrancar_servidor(self, rpc_targets: list[str]) -> None:
+        """Lanza llama-server con esos trabajadores y espera a que responda /health."""
         cmd = self.construir_comando_llama_server(rpc_targets)
         log.info("Iniciando llama-server con comando: %s", " ".join(cmd))
-
         self.server_proc, self.registro_server = procesos.lanzar(cmd, f"llama-server-{self.puerto_api}")
         log.info("Registro de llama-server: %s", self.registro_server)
 
         url_health = f"http://127.0.0.1:{self.puerto_api}/health"
-        listo = False
         async with httpx.AsyncClient() as client:
             fin = time.monotonic() + self.espera_carga
             while time.monotonic() < fin:
                 if self.server_proc.poll() is not None:
                     err = procesos.cola_registro(self.registro_server)
-                    self.detener()
                     raise RuntimeError(
                         f"llama-server termino inesperadamente (codigo {self.server_proc.returncode}): {err}"
                     )
                 try:
                     r = await client.get(url_health, timeout=1.0)
                     if r.status_code == 200:
-                        listo = True
-                        break
+                        log.info("Servidor listo en http://127.0.0.1:%d", self.puerto_api)
+                        return
                 except Exception:
                     pass
                 await asyncio.sleep(0.5)
+        raise TimeoutError(f"llama-server no respondio en {url_health} tras {self.espera_carga:.0f} segundos")
 
-        if not listo:
-            self.detener()
-            raise TimeoutError(f"llama-server no respondio en {url_health} tras {self.espera_carga:.0f} segundos")
+    async def _relanzar(self) -> bool:
+        """llama-server se cayó (en general porque se cayó un trabajador): vuelve a elegir entre los tubos
+        vivos y lo arranca de nuevo. Devuelve False si no lo logra."""
+        self.reinicios += 1
+        cola = procesos.cola_registro(self.registro_server) if self.registro_server else ""
+        log.warning("llama-server se cayo (codigo %s), reinicio %d de %d. Ultimas lineas:\n%s",
+                    self.server_proc.returncode if self.server_proc else None, self.reinicios,
+                    self.max_reinicios, cola[-1500:])
+        # El trabajador puede estar relanzando su ggml-rpc-server: se reintenta durante `espera_recuperar`.
+        fin = time.monotonic() + self.espera_recuperar
+        while True:
+            try:
+                await self._arrancar_servidor(await self.seleccionar_trabajadores())
+                return True
+            except (RuntimeError, TimeoutError, ValueError) as e:
+                if self.server_proc is not None and self.server_proc.poll() is None:
+                    self.server_proc.kill()
+                if time.monotonic() >= fin:
+                    log.error("No se pudo relanzar llama-server: %s", e)
+                    return False
+                log.warning("Todavia no se puede relanzar llama-server (%s); otro intento en 10 s", e)
+                await asyncio.sleep(10)
 
-        log.info("Servidor listo en http://127.0.0.1:%d", self.puerto_api)
+    async def iniciar(self, duracion: float = 0.0) -> None:
+        """Inicia el rele (si corresponde), selecciona tubos y arranca llama-server. Mientras corre, si
+        llama-server se cae lo relanza (hasta `max_reinicios` veces) con los trabajadores que sigan vivos."""
+        if self.iniciar_rele_local:
+            await self._iniciar_rele()
 
         try:
-            if duracion > 0:
-                await asyncio.sleep(duracion)
-            else:
-                while self.server_proc.poll() is None:
-                    await asyncio.sleep(1.0)
+            await self._arrancar_servidor(await self.seleccionar_trabajadores())
+        except Exception:
+            self.detener()
+            raise
+
+        try:
+            fin = time.monotonic() + duracion if duracion > 0 else float("inf")
+            while time.monotonic() < fin:
+                if self.server_proc is not None and self.server_proc.poll() is not None:
+                    if self.reinicios >= self.max_reinicios or not await self._relanzar():
+                        break
+                await asyncio.sleep(1.0)
         finally:
             self.detener()
 

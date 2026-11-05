@@ -80,7 +80,7 @@ if CONFIG["rele"] == "aqui":
     rele_log = open(f"{SALIDA}/rele.log", "w")
     proceso_rele = subprocess.Popen(
         [sys.executable, "rele.py"], cwd=f"{TRABAJO}/codigo/fabric/rele", stdout=rele_log, stderr=subprocess.STDOUT,
-        env=dict(os.environ, FABRIC_CLAVE=CONFIG["clave"], PUERTO="8095"),
+        env=dict(os.environ, FABRIC_CLAVE=CONFIG["clave"], PUERTO="8095", FABRIC_AVANCE=f"{SALIDA}/avance.json"),
     )
     binario_cf = f"{TRABAJO}/cloudflared"
     urllib.request.urlretrieve(
@@ -230,7 +230,7 @@ def trabajador():
     log("caché RPC:", resumen["cache_rpc"])
     etapa("cache_rpc", t0)
     dispositivos = ",".join(f"CUDA{i}" for i in range(len(gpus))) or "CPU"
-    rpc_log = open(f"{SALIDA}/rpc-server.log", "w")
+    rpc_log = open(f"{SALIDA}/rpc-server.log", "wb")
     proceso = subprocess.Popen(
         [rpc_bin, "-d", dispositivos, "-H", "127.0.0.1", "-p", "50052", "-c"], stdout=rpc_log,
         stderr=subprocess.STDOUT, env=dict(entorno, LLAMA_CACHE=cache), cwd=os.path.dirname(rpc_bin),
@@ -250,14 +250,39 @@ def trabajador():
         raise SystemExit(resumen["error"])
     log(f"ggml-rpc-server en 127.0.0.1:50052 con {dispositivos}")
 
+    resumen["rpc_caidas"] = []
+
+    def relanzar():
+        nonlocal proceso
+        rpc_log.write(f"\n===== relanzado tras caída {len(resumen['rpc_caidas'])} =====\n".encode())
+        rpc_log.flush()
+        proceso = subprocess.Popen(
+            [rpc_bin, "-d", dispositivos, "-H", "127.0.0.1", "-p", "50052", "-c"], stdout=rpc_log,
+            stderr=subprocess.STDOUT, env=dict(entorno, LLAMA_CACHE=cache), cwd=os.path.dirname(rpc_bin),
+        )
+
     async def vivir():
         vram = round(sum(float(g[1].split()[0]) for g in gpus) / 1024, 1) if gpus else 0
         tubo = Tubo("buscar", CONFIG["clave"], CONFIG["tubo"], 50052, info={"vram_gb": vram})
         tarea = asyncio.create_task(tubo.vivir())
         fin = time.time() + CONFIG["duracion_min"] * 60
-        while time.time() < fin and proceso.poll() is None:
-            await asyncio.sleep(60)
-            log(f"tubo {CONFIG['tubo']}: {tubo.bytes / 1e6:.1f} MB, {tubo.conexiones} conexiones")
+        ultimo_aviso = time.time()
+        while time.time() < fin:
+            await asyncio.sleep(2)
+            if proceso.poll() is not None:
+                # Se cayó (4-nov-2026: en el trozo 43). Se relanza en el mismo puerto; el tubo sigue abierto
+                # y el maestro relanza su llama-server y retoma.
+                if len(resumen["rpc_caidas"]) >= 5:
+                    log("ggml-rpc-server se cayó 5 veces; no se relanza más")
+                    break
+                rpc_log.flush()
+                resumen["rpc_caidas"].append({"t_s": round(time.time() - INICIO, 1), "codigo": proceso.returncode})
+                log("ggml-rpc-server se cayó:", resumen["rpc_caidas"][-1])
+                guardar_resumen()
+                relanzar()
+            if time.time() - ultimo_aviso >= 60:
+                ultimo_aviso = time.time()
+                log(f"tubo {CONFIG['tubo']}: {tubo.bytes / 1e6:.1f} MB, {tubo.conexiones} conexiones")
         tarea.cancel()
         return tubo
 
@@ -300,9 +325,14 @@ if ROL == "maestro":
         time.sleep(5)
     candidatos = [reparto.Candidato(n, d["puerto"], float((d.get("info") or {}).get("vram_gb", 0)))
                   for n, d in tubos.items()]
+    medidas = {}
     for cand in candidatos:
-        cand.rtt_ms = reparto.medir_rtt(cand.puerto)
-    resumen["trabajadores"] = {cand.nombre: {"vram_gb": cand.vram_gb, "rtt_ms": round(cand.rtt_ms, 1)} for cand in candidatos}
+        medidas[cand.nombre] = reparto.medir_enlace(cand.puerto)
+        cand.rtt_ms = medidas[cand.nombre]["rtt_ms"]
+    # rtt_ms: ida y vuelta por el tubo ya abierto; conexion_ms: abrir el tubo + HELLO (no es el ping)
+    resumen["trabajadores"] = {cand.nombre: {"vram_gb": cand.vram_gb, "rtt_ms": round(cand.rtt_ms, 1),
+                                             "conexion_ms": round(medidas[cand.nombre]["conexion_ms"], 1)}
+                               for cand in candidatos}
     log("trabajadores:", resumen["trabajadores"])
     propio_gb = sum(float(g[1].split()[0]) for g in gpus) / 1024 if gpus else 0
     try:
@@ -380,15 +410,15 @@ log("VRAM en uso:", sh("nvidia-smi --query-gpu=memory.used,memory.total --format
 import re  # noqa: E402
 
 diagnostico = {"llama": str(estado.get("llama_origen"))}
-reparto = []
+reparto_capas = []
 for linea in open(f"{SALIDA}/llama-server.log", errors="replace"):
     if "offloaded" in linea:
         diagnostico["capas_gpu"] = linea.strip().split("offloaded", 1)[1].strip()[:60]
     m = re.search(r"(\S+) model buffer size =\s*([\d.]+) MiB", linea)
     if m:
-        reparto.append(f"{m.group(1)}={float(m.group(2)) / 1024:.1f}GB")
-if reparto:
-    diagnostico["reparto"] = " ".join(reparto)
+        reparto_capas.append(f"{m.group(1)}={float(m.group(2)) / 1024:.1f}GB")
+if reparto_capas:
+    diagnostico["reparto"] = " ".join(reparto_capas)
 if puerto_tubo:
     diagnostico["equipos"] = 1 + len(rpc)
     diagnostico["rtt_ms"] = " ".join(f"{v['rtt_ms']}" for k, v in resumen["trabajadores"].items() if k in resumen["elegidos"])
@@ -425,13 +455,82 @@ if CONFIG.get("trozos"):
     # Dejar de empezar trozos 10 min antes del final: el trabajador tiene que seguir vivo.
     restante = CONFIG["duracion_min"] * 60 - (time.time() - INICIO) - 600
 
+    avance = {"trozos_total": len(CONFIG["trozos"]), "trozos_hechos": 0, "exactos": 0, "errores": 0,
+              "chars_hechos": 0, "chars_total": sum(len(x) for x in CONFIG["trozos"])}
+
     def al_trozo(i, fila):
         log(f"trozo {i + 1}/{len(CONFIG['trozos'])}:", {k: v for k, v in fila.items() if k != "salida"})
+        # Para ver el avance desde afuera: el relé lo muestra en /salud (solo cifras, nada del texto).
+        avance["trozos_hechos"] += 1
+        avance["exactos"] += 1 if fila.get("exacto") else 0
+        avance["errores"] += 1 if "error" in fila else 0
+        avance["chars_hechos"] += fila.get("chars_original", 0)
+        avance["ultimo_trozo"] = i + 1
+        avance["ultimo_tok_s"] = round(fila.get("gen_tok_s") or 0, 2)
+        avance["minutos"] = round((time.time() - t) / 60, 1)
+        avance["caidas"] = len(resumen.get("llama_caidas", []))
+        with open(f"{SALIDA}/avance.json", "w") as f:
+            json.dump(avance, f)
+
+    resumen["llama_caidas"] = []
+
+    def relanzar_llama() -> bool:
+        """llama-server dejó de responder (4-nov-2026: se cayó el ggml-rpc-server del trabajador y llama-server
+        abortó). Espera a que el tubo responda de nuevo (el trabajador relanza su ggml-rpc-server) y arranca
+        llama-server con el mismo comando. False si no se logra: la transcripción se detiene sin marcar
+        como fallados los trozos que faltan."""
+        global servidor, registro
+        if len(resumen["llama_caidas"]) >= 3:
+            return False
+        caida = {"t_s": round(time.time() - INICIO, 1), "codigo": servidor.poll()}
+        resumen["llama_caidas"].append(caida)
+        n = len(resumen["llama_caidas"])
+        if servidor.poll() is None:
+            servidor.terminate()
+            try:
+                servidor.wait(timeout=20)
+            except subprocess.TimeoutExpired:
+                servidor.kill()
+        registro.close()
+        shutil.copy(f"{SALIDA}/llama-server.log", f"{SALIDA}/llama-server-caida-{n}.log")
+        log("llama-server caído:", caida)
+        # El 4-nov-2026 el corte fue del túnel (WebSocket sin cuadro de cierre), no del trabajador: su tubo
+        # se reconecta solo, pero el relé puede darle otro puerto. Se buscan los tubos por nombre.
+        limite = time.time() + 600
+        puertos = None
+        while time.time() < limite:
+            try:
+                tubos_ahora = salud_local().get("tubos", {})
+                puertos = [int(tubos_ahora[n]["puerto"]) for n in resumen["elegidos"]]
+                medidas = [reparto.medir_enlace(p, veces=2, espera_s=15) for p in puertos]
+                if all(m["rtt_ms"] != float("inf") for m in medidas):
+                    caida["rtt_ms_al_volver"] = [round(m["rtt_ms"], 1) for m in medidas]
+                    break
+            except (KeyError, OSError, ValueError):
+                pass
+            time.sleep(10)
+        else:
+            caida["resultado"] = "el trabajador no volvió en 10 min"
+            guardar_resumen()
+            return False
+        comando_nuevo = list(comando_spec)
+        comando_nuevo[comando_nuevo.index("--rpc") + 1] = ",".join(f"127.0.0.1:{p}" for p in puertos)
+        registro = open(f"{SALIDA}/llama-server.log", "w")
+        servidor = subprocess.Popen(comando_nuevo, stdout=registro, stderr=subprocess.STDOUT, env=entorno,
+                                    cwd=os.path.dirname(binario))
+        t_rel = time.time()
+        ok = transcripcion.esperar_servidor("http://127.0.0.1:8080", 900, 2)
+        caida["resultado"] = "relanzado" if ok else "llama-server no volvió a arrancar"
+        caida["relanzar_s"] = round(time.time() - t_rel, 1)
+        log("relanzar llama-server:", caida)
+        guardar_resumen()
+        return ok
 
     log(f"transcribiendo {len(CONFIG['trozos'])} trozos con {CONFIG['paralelo']} flujos")
     t = time.time()
     res = transcripcion.transcribir("http://127.0.0.1:8080", CONFIG["trozos"], flujos=CONFIG["paralelo"],
-                                    salida_dir=SALIDA, limite_s=restante, al_terminar_trozo=al_trozo)
+                                    salida_dir=SALIDA, limite_s=restante, al_terminar_trozo=al_trozo,
+                                    recuperar=relanzar_llama if rpc else None)
     res["spec"] = resumen.get("spec_usada")
     res["tubo_mb"] = round((salud_local()["tubo_bytes"] - tubo_ini) / 1e6, 1) if puerto_tubo else 0
     resumen["transcripcion"] = res

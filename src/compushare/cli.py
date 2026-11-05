@@ -349,6 +349,7 @@ def servir(
     paralelo: int = typer.Option(1, help="Peticiones atendidas a la vez (flujos)"),
     especulativa: str = typer.Option("", help="Decodificacion especulativa de llama.cpp: ngram-mod, draft-mtp... (vacio = ninguna)"),
     espera_carga: float = typer.Option(900.0, help="Segundos maximos para que llama-server cargue el modelo"),
+    reinicios: int = typer.Option(3, help="Veces que se relanza llama-server si se cae (por ejemplo, si se cae un trabajador)"),
     duracion: float = typer.Option(0.0, help="Segundos tras los cuales salir (0 para infinito)"),
 ):
     """Inicia el nodo maestro: reparte el modelo entre los trabajadores y sirve llama-server en 127.0.0.1."""
@@ -381,6 +382,7 @@ def servir(
         paralelo=paralelo,
         especulativa=especulativa,
         espera_carga=espera_carga,
+        max_reinicios=reinicios,
     )
 
     try:
@@ -479,6 +481,8 @@ def transcribir(
     desde: int = typer.Option(0, help="Primer trozo"),
     cuantos: int = typer.Option(0, help="Cuantos trozos (0 = todos)"),
     salida: Path = typer.Option(Path("transcripcion"), help="Carpeta donde guardar transcripcion.json y el texto copiado"),
+    espera_caida: float = typer.Option(900.0, help="Si llama-server deja de responder, segundos a esperar a que el maestro lo relance (0 = no esperar)"),
+    retomar: bool = typer.Option(False, help="Saltar los trozos ya bien hechos en --salida"),
 ):
     """El modelo de la red copia el texto trozo a trozo; cada trozo se compara letra por letra con el original."""
     if not archivo.is_file():
@@ -495,7 +499,12 @@ def transcribir(
         marca = "[green]exacto[/green]" if f["exacto"] else f"[yellow]parecido {f['parecido']}[/yellow]"
         console.print(f"  trozo {i + 1}: {marca}, {f['gen_n']} tokens a {(f['gen_tok_s'] or 0):.1f} tok/s, {f['pared_s']} s")
 
-    res = transcripcion.transcribir(url, textos, flujos=flujos, salida_dir=salida, al_terminar_trozo=avance)
+    def recuperar() -> bool:
+        console.print(f"  [yellow]llama-server no responde; esperando hasta {espera_caida:.0f} s a que vuelva[/yellow]")
+        return transcripcion.esperar_servidor(url, espera_caida)
+
+    res = transcripcion.transcribir(url, textos, flujos=flujos, salida_dir=salida, al_terminar_trozo=avance,
+                                    recuperar=recuperar if espera_caida > 0 else None, retomar=retomar)
     tabla = Table(title="Transcripcion (medido)", show_header=False)
     for k, v in res.items():
         tabla.add_row(k, str(v))

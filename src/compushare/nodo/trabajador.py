@@ -108,6 +108,8 @@ class NodoTrabajador:
         self.host = host
         self.rpc_proc: subprocess.Popen[Any] | None = None
         self.registro_rpc: Path | None = None
+        self.reinicios_rpc = 0
+        self.max_reinicios_rpc = 5
         self.tubo: Tubo | None = None
         self._detenido = False
 
@@ -131,7 +133,8 @@ class NodoTrabajador:
 
         if not esperar_puerto_tcp("127.0.0.1", self.puerto_rpc, tiempo_limite=10.0):
             err = procesos.cola_registro(self.registro_rpc)
-            self.detener()
+            if self.rpc_proc.poll() is None:
+                self.rpc_proc.kill()
             raise RuntimeError(f"ggml-rpc-server no respondio en 127.0.0.1:{self.puerto_rpc}. Detalle: {err}")
         return self.rpc_proc
 
@@ -149,6 +152,7 @@ class NodoTrabajador:
         )
 
         tarea_tubo = asyncio.create_task(self.tubo.vivir())
+        vigia = asyncio.create_task(self._vigilar_rpc())
         try:
             if duracion > 0:
                 await asyncio.wait_for(asyncio.shield(tarea_tubo), timeout=duracion)
@@ -157,9 +161,30 @@ class NodoTrabajador:
         except asyncio.TimeoutError:
             log.info("Duracion limite alcanzada (%s s)", duracion)
         finally:
+            vigia.cancel()
             tarea_tubo.cancel()
-            await asyncio.gather(tarea_tubo, return_exceptions=True)
+            await asyncio.gather(tarea_tubo, vigia, return_exceptions=True)
             self.detener()
+
+    async def _vigilar_rpc(self, cada_s: float = 2.0) -> None:
+        """Si ggml-rpc-server se cae, lo relanza en el mismo puerto: el tubo sigue abierto y el maestro
+        puede volver a conectarse (en Kaggle, el 4-nov-2026, se cayó en el trozo 43 y todo se detuvo)."""
+        while True:
+            await asyncio.sleep(cada_s)
+            if self.rpc_proc is None or self.rpc_proc.poll() is None:
+                continue
+            if self.reinicios_rpc >= self.max_reinicios_rpc:
+                log.error("ggml-rpc-server se cayo %d veces; no se relanza mas", self.reinicios_rpc)
+                return
+            self.reinicios_rpc += 1
+            log.warning("ggml-rpc-server se cayo (codigo %s); relanzando (%d de %d). Ultimas lineas:\n%s",
+                        self.rpc_proc.returncode, self.reinicios_rpc, self.max_reinicios_rpc,
+                        procesos.cola_registro(self.registro_rpc, 1500))
+            try:
+                await asyncio.to_thread(self.iniciar_rpc_server)
+            except RuntimeError as e:
+                log.error("No se pudo relanzar ggml-rpc-server: %s", e)
+                return
 
     def detener(self) -> None:
         """Detiene ggml-rpc-server matando SOLO su PID especifico."""

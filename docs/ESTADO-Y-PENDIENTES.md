@@ -1,5 +1,39 @@
 # Computadora compartida (CompuShare): estado y pendientes
 
+## Actualización del 4-nov-2026 (noche)
+
+Medido en local (Qwen3.5-0.8B, llama.cpp 11193) y en los registros de Kaggle del 4-nov:
+
+- **El patrón de la tabla de salida estaba mal.** `-ot (token_embd|output)\.weight=...` no tenía anclas y
+  también atrapaba `blk.N.attn_output.weight` de cada capa de atención completa. Esas proyecciones quedaban en
+  el maestro y cada token rebotaba maestro-trabajador una vez más por cada una. Con un proxy que lee el
+  protocolo RPC, por enlace y por token: antes 707 KB y 4 idas y vueltas; con `^(token_embd|output)\.weight$`
+  13,9 KB y 1, y llama.cpp reutiliza el grafo (comando 16) en vez de mandarlo entero. Con 5 trabajadores a
+  50 ms simulados, mismo trozo y misma salida: sin especulativa de 1,10 a 2,54 tok/s; con `ngram-mod` de
+  3,08 a 4,67 tok/s. **Toda medición anterior hecha con el patrón sin anclas quedó afectada** (entre ellas las
+  de A2 y A7 de esta tabla).
+- **El "ping" informado no era el ping.** `medir_rtt` abría una conexión nueva por medición: medía abrir el tubo
+  por el relé más el saludo HELLO (664 ms en Kaggle el 4-nov, 237 ms el 31-oct). Ahora `medir_enlace` da
+  `conexion_ms` y `rtt_ms` (DEVICE_COUNT sobre la conexión abierta) por separado.
+- **La caída del trozo 43 en Kaggle no fue del trabajador.** Su `ggml-rpc-server` siguió vivo hasta el final
+  (`rpc_server_vivo: true`). A las 00:32:33 UTC se cortaron las conexiones WebSocket por el túnel de Cloudflare
+  sin cuadro de cierre; el tubo se reconectó al segundo, pero el maestro no sabía recuperarse y marcó como
+  fallados los 50 trozos restantes.
+- **Recuperación agregada.** El trabajador relanza `ggml-rpc-server` si se cae; el maestro relanza `llama-server`
+  con los tubos vivos (`--reinicios`); `transcribir` espera, repite el trozo y no da por fallados los que faltan
+  (`--retomar` salta lo ya hecho). Prueba local matando el `ggml-rpc-server` de un trabajador a mitad: el
+  trabajador lo relanzó en 2 s, el maestro tuvo `llama-server` listo 4 s después y salieron 6 de 6 trozos sin errores.
+
+- **Kaggle con los arreglos (4-nov, 21:35).** Qwen3.5-9B en 2 cuadernos: La metamorfosis entera, 93 de 93 trozos
+  en 27,4 min, 0 errores, 90 exactos (los trozos 1, 3 y 35 cambian comillas tipográficas por rectas), 18,99 tok/s
+  de generación (antes 6,46), 233,2 tok/s de lectura (antes 47,4), 89,7 % de aciertos. Ida y vuelta por el tubo
+  abierto 37,1 ms; abrir el tubo 667,1 ms. No hubo cortes, así que la recuperación no se ejercitó en Kaggle.
+  Métricas en `fabric/kaggle/resultados/20261104-metamorfosis`.
+
+Pendiente: el ancho de banda con especulativa (18.087 MB en la transcripción, unos 633 KB por token generado,
+11,0 MB/s). En local se vio que llama.cpp lee el estado recurrente entero de cada capa del trabajador al menos una
+vez por petición y vuelve a mandar el grafo cuando cambia el tamaño del lote.
+
 ## Resumen
 
 CompuShare junta varias computadoras para correr UN modelo que no cabe en ninguna sola, para que SynRAG le pregunte a la red. Al 4-nov el plan (fases F0-F9) está escrito, 11 de 16 tareas de agentes están entregadas y la meta inmediata es juntar todo en `main` y hacer la prueba final en Kaggle (F9).

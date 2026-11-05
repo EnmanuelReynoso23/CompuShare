@@ -31,31 +31,54 @@ def test_minimo_y_caidos():
         reparto.elegir(cs, 100, 30)
 
 
-def test_rtt_con_hello_rpc():
+def _recibir(con, n):
+    datos = b""
+    while len(datos) < n:
+        trozo = con.recv(n - len(datos))
+        if not trozo:
+            raise ConnectionError
+        datos += trozo
+    return datos
+
+
+def test_rtt_sobre_conexion_abierta():
+    """HELLO al conectar y luego pings DEVICE_COUNT por la misma conexión; el servidor tarda 200 ms en
+    aceptar (como abrir un tubo por el relé) y eso va a conexion_ms, no a rtt_ms."""
+    import time
+
     servidor = socket.socket()
     servidor.bind(("127.0.0.1", 0))
     servidor.listen()
     puerto = servidor.getsockname()[1]
+    vistos = []
 
     def atender():
-        for _ in range(2):
-            con, _ = servidor.accept()
-            pedido = con.recv(1 + 8 + reparto.HELLO_TAM)
-            assert pedido[0] == reparto.RPC_CMD_HELLO
-            assert struct.unpack("<Q", pedido[1:9])[0] == reparto.HELLO_TAM
-            con.sendall(struct.pack("<Q", 28) + bytes(28))
+        con, _ = servidor.accept()
+        time.sleep(0.2)
+        pedido = _recibir(con, 1 + 8 + reparto.HELLO_TAM)
+        assert pedido[0] == reparto.RPC_CMD_HELLO
+        assert struct.unpack("<Q", pedido[1:9])[0] == reparto.HELLO_TAM
+        con.sendall(struct.pack("<Q", 28) + bytes(28))
+        try:
+            while True:
+                cab = _recibir(con, 9)
+                vistos.append(cab[0])
+                con.sendall(struct.pack("<Q", 4) + struct.pack("<I", 1))
+        except ConnectionError:
             con.close()
 
     threading.Thread(target=atender, daemon=True).start()
-    assert reparto.medir_rtt(puerto, veces=2) < 1000
+    m = reparto.medir_enlace(puerto, veces=3)
+    assert m["conexion_ms"] >= 200 and m["rtt_ms"] < 100
+    assert vistos == [reparto.RPC_CMD_DEVICE_COUNT] * 3
     servidor.close()
     assert reparto.medir_rtt(puerto, veces=1, espera_s=1) == float("inf")
 
 
 def test_salida_en_el_maestro():
     from fabric.reparto import salida_en_el_maestro
-    assert salida_en_el_maestro(0) == ["-ot", r"(token_embd|output)\.weight=CPU"]
-    assert salida_en_el_maestro(2) == ["-ot", r"(token_embd|output)\.weight=CUDA1"]
+    assert salida_en_el_maestro(0) == ["-ot", r"^(token_embd|output)\.weight$=CPU"]
+    assert salida_en_el_maestro(2) == ["-ot", r"^(token_embd|output)\.weight$=CUDA1"]
 
 
 def test_mtp_en_el_maestro():
@@ -64,3 +87,14 @@ def test_mtp_en_el_maestro():
     assert mtp_en_el_maestro(1) == ["-ot", r"blk\.24\..*=CUDA0"]
     assert mtp_en_el_maestro(0, patron_capa=r"blk\.32\..*") == ["-ot", r"blk\.32\..*=CPU"]
 
+
+
+def test_avance_en_salud_solo_cifras(tmp_path, monkeypatch):
+    from fabric.rele import rele
+
+    ruta = tmp_path / "avance.json"
+    ruta.write_text('{"trozos_hechos": 3, "trozos_total": 93, "texto": "' + "x" * 200 + '", "lista": [1]}')
+    monkeypatch.setenv("FABRIC_AVANCE", str(ruta))
+    assert rele.leer_avance() == {"trozos_hechos": 3, "trozos_total": 93}
+    monkeypatch.setenv("FABRIC_AVANCE", str(tmp_path / "no-existe.json"))
+    assert rele.leer_avance() is None

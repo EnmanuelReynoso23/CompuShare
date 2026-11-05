@@ -193,6 +193,7 @@ class Rele:
             "tubos": {o.nombre: {"puerto": o.puerto, "abiertos": o.abiertos, "info": o.info}
                       for o in self.ofertas.values()},
             "tubo_bytes": self.tubo_bytes,
+            "avance": leer_avance(),
         }
 
     # ── conexión ────────────────────────────────────────────────────────────
@@ -557,6 +558,22 @@ class Rele:
         cabeceras = Headers([("Content-Type", "application/json"), ("Content-Length", str(len(cuerpo))),
                              ("Access-Control-Allow-Origin", "*")])
         return Response(HTTPStatus.OK.value, "OK", cabeceras, cuerpo)
+
+
+def leer_avance() -> dict[str, Any] | None:
+    """Cifras de avance del trabajo en curso (por ejemplo cuántos trozos del libro van), para verlas desde
+    afuera en /salud. Las escribe el maestro en el archivo FABRIC_AVANCE; solo números, nunca el texto."""
+    ruta = os.environ.get("FABRIC_AVANCE")
+    if not ruta:
+        return None
+    try:
+        with open(ruta, encoding="utf-8") as f:
+            datos = json.loads(f.read(4096))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(datos, dict):
+        return None
+    return {k: v for k, v in datos.items() if isinstance(v, (int, float, str, bool)) and len(str(v)) <= 80}
 
 
 async def principal(clave: str = CLAVE, puerto: int = PUERTO, listo: asyncio.Event | None = None) -> None:

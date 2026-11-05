@@ -1,0 +1,946 @@
+{
+ "resumen": {
+  "trozos_total": 93,
+  "trozos_hechos": 93,
+  "trozos_con_error": 51,
+  "trozos_exactos": 39,
+  "parecido_medio": 0.9999,
+  "chars_hechos": 119123,
+  "chars_total": 119123,
+  "prompt_tokens": 15141,
+  "gen_tokens": 13419,
+  "aciertos_especulativa": 0.888,
+  "pared_s": 2416.9,
+  "tok_s_total": 5.55,
+  "flujos": 1
+ },
+ "trozos": [
+  {
+   "exacto": false,
+   "parecido": 0.9992,
+   "chars_original": 1181,
+   "chars_salida": 1181,
+   "prompt_n": 336,
+   "prompt_ms": 8985.375,
+   "gen_n": 295,
+   "gen_ms": 65938.603,
+   "gen_tok_s": 4.458693187661255,
+   "draft_n": 356,
+   "draft_aceptados": 276,
+   "pared_s": 74.9,
+   "parada": "eos",
+   "i": 0
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 415,
+   "chars_salida": 415,
+   "prompt_n": 143,
+   "prompt_ms": 5725.32,
+   "gen_n": 102,
+   "gen_ms": 27986.747,
+   "gen_tok_s": 3.608851003655409,
+   "draft_n": 146,
+   "draft_aceptados": 93,
+   "pared_s": 33.7,
+   "parada": "eos",
+   "i": 1
+  },
+  {
+   "exacto": false,
+   "parecido": 0.9993,
+   "chars_original": 1476,
+   "chars_salida": 1476,
+   "prompt_n": 404,
+   "prompt_ms": 7431.214,
+   "gen_n": 363,
+   "gen_ms": 69374.162,
+   "gen_tok_s": 5.218081048676307,
+   "draft_n": 423,
+   "draft_aceptados": 342,
+   "pared_s": 76.8,
+   "parada": "eos",
+   "i": 2
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 943,
+   "chars_salida": 943,
+   "prompt_n": 272,
+   "prompt_ms": 6738.362,
+   "gen_n": 231,
+   "gen_ms": 42708.124,
+   "gen_tok_s": 5.3853922499616225,
+   "draft_n": 274,
+   "draft_aceptados": 220,
+   "pared_s": 49.5,
+   "parada": "eos",
+   "i": 3
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 5487,
+   "chars_salida": 5487,
+   "prompt_n": 1341,
+   "prompt_ms": 22183.553,
+   "gen_n": 1300,
+   "gen_ms": 180941.857,
+   "gen_tok_s": 7.1791017376371915,
+   "draft_n": 1300,
+   "draft_aceptados": 1270,
+   "pared_s": 203.1,
+   "parada": "eos",
+   "i": 4
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1017,
+   "chars_salida": 1017,
+   "prompt_n": 280,
+   "prompt_ms": 6411.212,
+   "gen_n": 239,
+   "gen_ms": 41054.857,
+   "gen_tok_s": 5.7971216414174815,
+   "draft_n": 274,
+   "draft_aceptados": 228,
+   "pared_s": 47.5,
+   "parada": "eos",
+   "i": 5
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1397,
+   "chars_salida": 1397,
+   "prompt_n": 366,
+   "prompt_ms": 7188.081,
+   "gen_n": 325,
+   "gen_ms": 50418.919,
+   "gen_tok_s": 6.426159196312797,
+   "draft_n": 338,
+   "draft_aceptados": 313,
+   "pared_s": 57.6,
+   "parada": "eos",
+   "i": 6
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1416,
+   "chars_salida": 1416,
+   "prompt_n": 373,
+   "prompt_ms": 8222.479,
+   "gen_n": 332,
+   "gen_ms": 48349.685,
+   "gen_tok_s": 6.845959803047322,
+   "draft_n": 338,
+   "draft_aceptados": 320,
+   "pared_s": 56.6,
+   "parada": "eos",
+   "i": 7
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1295,
+   "chars_salida": 1295,
+   "prompt_n": 336,
+   "prompt_ms": 7237.031,
+   "gen_n": 295,
+   "gen_ms": 50696.055,
+   "gen_tok_s": 5.799267812850527,
+   "draft_n": 338,
+   "draft_aceptados": 283,
+   "pared_s": 57.9,
+   "parada": "eos",
+   "i": 8
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1092,
+   "chars_salida": 1092,
+   "prompt_n": 315,
+   "prompt_ms": 7112.847,
+   "gen_n": 274,
+   "gen_ms": 44300.101,
+   "gen_tok_s": 6.162514166728423,
+   "draft_n": 274,
+   "draft_aceptados": 263,
+   "pared_s": 51.4,
+   "parada": "eos",
+   "i": 9
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 619,
+   "chars_salida": 619,
+   "prompt_n": 195,
+   "prompt_ms": 5392.24,
+   "gen_n": 154,
+   "gen_ms": 20995.206,
+   "gen_tok_s": 7.287377889981171,
+   "draft_n": 146,
+   "draft_aceptados": 146,
+   "pared_s": 26.4,
+   "parada": "eos",
+   "i": 10
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1169,
+   "chars_salida": 1169,
+   "prompt_n": 331,
+   "prompt_ms": 6881.939,
+   "gen_n": 290,
+   "gen_ms": 45321.985,
+   "gen_tok_s": 6.376596258967916,
+   "draft_n": 338,
+   "draft_aceptados": 278,
+   "pared_s": 52.2,
+   "parada": "eos",
+   "i": 11
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1301,
+   "chars_salida": 1301,
+   "prompt_n": 361,
+   "prompt_ms": 6847.761,
+   "gen_n": 320,
+   "gen_ms": 51318.675,
+   "gen_tok_s": 6.216060722534242,
+   "draft_n": 338,
+   "draft_aceptados": 308,
+   "pared_s": 58.2,
+   "parada": "eos",
+   "i": 12
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1305,
+   "chars_salida": 1305,
+   "prompt_n": 355,
+   "prompt_ms": 9446.505,
+   "gen_n": 314,
+   "gen_ms": 52444.563,
+   "gen_tok_s": 5.968206847295114,
+   "draft_n": 338,
+   "draft_aceptados": 302,
+   "pared_s": 61.9,
+   "parada": "eos",
+   "i": 13
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1255,
+   "chars_salida": 1255,
+   "prompt_n": 352,
+   "prompt_ms": 12505.936,
+   "gen_n": 311,
+   "gen_ms": 46455.879,
+   "gen_tok_s": 6.672998265730802,
+   "draft_n": 338,
+   "draft_aceptados": 299,
+   "pared_s": 59.0,
+   "parada": "eos",
+   "i": 14
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 647,
+   "chars_salida": 647,
+   "prompt_n": 193,
+   "prompt_ms": 4328.568,
+   "gen_n": 152,
+   "gen_ms": 25197.696,
+   "gen_tok_s": 5.99261138796182,
+   "draft_n": 146,
+   "draft_aceptados": 143,
+   "pared_s": 29.5,
+   "parada": "eos",
+   "i": 15
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1519,
+   "chars_salida": 1519,
+   "prompt_n": 429,
+   "prompt_ms": 7699.937,
+   "gen_n": 388,
+   "gen_ms": 51725.102,
+   "gen_tok_s": 7.481860548095199,
+   "draft_n": 402,
+   "draft_aceptados": 375,
+   "pared_s": 59.4,
+   "parada": "eos",
+   "i": 16
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1276,
+   "chars_salida": 1276,
+   "prompt_n": 333,
+   "prompt_ms": 6752.105,
+   "gen_n": 292,
+   "gen_ms": 43998.698,
+   "gen_tok_s": 6.613832072939977,
+   "draft_n": 338,
+   "draft_aceptados": 280,
+   "pared_s": 50.8,
+   "parada": "eos",
+   "i": 17
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1412,
+   "chars_salida": 1412,
+   "prompt_n": 411,
+   "prompt_ms": 7811.979,
+   "gen_n": 370,
+   "gen_ms": 54217.52,
+   "gen_tok_s": 6.805918086994757,
+   "draft_n": 402,
+   "draft_aceptados": 357,
+   "pared_s": 62.0,
+   "parada": "eos",
+   "i": 18
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1271,
+   "chars_salida": 1271,
+   "prompt_n": 341,
+   "prompt_ms": 7621.066,
+   "gen_n": 300,
+   "gen_ms": 42702.505,
+   "gen_tok_s": 7.001931151345805,
+   "draft_n": 338,
+   "draft_aceptados": 288,
+   "pared_s": 50.3,
+   "parada": "eos",
+   "i": 19
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1297,
+   "chars_salida": 1297,
+   "prompt_n": 346,
+   "prompt_ms": 6454.111,
+   "gen_n": 305,
+   "gen_ms": 42465.076,
+   "gen_tok_s": 7.158823876825276,
+   "draft_n": 338,
+   "draft_aceptados": 293,
+   "pared_s": 48.9,
+   "parada": "eos",
+   "i": 20
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1422,
+   "chars_salida": 1422,
+   "prompt_n": 387,
+   "prompt_ms": 9581.065,
+   "gen_n": 346,
+   "gen_ms": 44859.176,
+   "gen_tok_s": 7.690734221243832,
+   "draft_n": 338,
+   "draft_aceptados": 334,
+   "pared_s": 54.4,
+   "parada": "eos",
+   "i": 21
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1357,
+   "chars_salida": 1357,
+   "prompt_n": 366,
+   "prompt_ms": 7270.032,
+   "gen_n": 325,
+   "gen_ms": 44508.909,
+   "gen_tok_s": 7.2794415158547245,
+   "draft_n": 338,
+   "draft_aceptados": 313,
+   "pared_s": 51.8,
+   "parada": "eos",
+   "i": 22
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1264,
+   "chars_salida": 1264,
+   "prompt_n": 332,
+   "prompt_ms": 7028.178,
+   "gen_n": 291,
+   "gen_ms": 45313.106,
+   "gen_tok_s": 6.399914408868815,
+   "draft_n": 338,
+   "draft_aceptados": 279,
+   "pared_s": 52.3,
+   "parada": "eos",
+   "i": 23
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1368,
+   "chars_salida": 1368,
+   "prompt_n": 381,
+   "prompt_ms": 7241.561,
+   "gen_n": 340,
+   "gen_ms": 45581.624,
+   "gen_tok_s": 7.437207590497433,
+   "draft_n": 338,
+   "draft_aceptados": 328,
+   "pared_s": 52.8,
+   "parada": "eos",
+   "i": 24
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1233,
+   "chars_salida": 1233,
+   "prompt_n": 348,
+   "prompt_ms": 6118.214,
+   "gen_n": 307,
+   "gen_ms": 45566.708,
+   "gen_tok_s": 6.7154291681549605,
+   "draft_n": 338,
+   "draft_aceptados": 295,
+   "pared_s": 51.7,
+   "parada": "eos",
+   "i": 25
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1233,
+   "chars_salida": 1233,
+   "prompt_n": 334,
+   "prompt_ms": 7936.461,
+   "gen_n": 293,
+   "gen_ms": 46292.068,
+   "gen_tok_s": 6.307776096760248,
+   "draft_n": 338,
+   "draft_aceptados": 281,
+   "pared_s": 54.2,
+   "parada": "eos",
+   "i": 26
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1280,
+   "chars_salida": 1280,
+   "prompt_n": 353,
+   "prompt_ms": 8251.425,
+   "gen_n": 312,
+   "gen_ms": 44378.149,
+   "gen_tok_s": 7.007953396163504,
+   "draft_n": 338,
+   "draft_aceptados": 300,
+   "pared_s": 52.6,
+   "parada": "eos",
+   "i": 27
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1416,
+   "chars_salida": 1416,
+   "prompt_n": 379,
+   "prompt_ms": 7907.974,
+   "gen_n": 338,
+   "gen_ms": 47298.837,
+   "gen_tok_s": 7.124910914828624,
+   "draft_n": 338,
+   "draft_aceptados": 326,
+   "pared_s": 55.2,
+   "parada": "eos",
+   "i": 28
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1178,
+   "chars_salida": 1178,
+   "prompt_n": 322,
+   "prompt_ms": 6432.086,
+   "gen_n": 281,
+   "gen_ms": 39390.247,
+   "gen_tok_s": 7.108358574141461,
+   "draft_n": 274,
+   "draft_aceptados": 270,
+   "pared_s": 45.8,
+   "parada": "eos",
+   "i": 29
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1332,
+   "chars_salida": 1332,
+   "prompt_n": 358,
+   "prompt_ms": 6623.624,
+   "gen_n": 317,
+   "gen_ms": 46416.175,
+   "gen_tok_s": 6.807971574564255,
+   "draft_n": 338,
+   "draft_aceptados": 305,
+   "pared_s": 53.0,
+   "parada": "eos",
+   "i": 30
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1025,
+   "chars_salida": 1025,
+   "prompt_n": 273,
+   "prompt_ms": 6013.098,
+   "gen_n": 232,
+   "gen_ms": 35842.202,
+   "gen_tok_s": 6.444916526054957,
+   "draft_n": 274,
+   "draft_aceptados": 221,
+   "pared_s": 41.9,
+   "parada": "eos",
+   "i": 31
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1091,
+   "chars_salida": 1091,
+   "prompt_n": 302,
+   "prompt_ms": 5737.621,
+   "gen_n": 261,
+   "gen_ms": 41151.966,
+   "gen_tok_s": 6.318045655461515,
+   "draft_n": 274,
+   "draft_aceptados": 250,
+   "pared_s": 46.9,
+   "parada": "eos",
+   "i": 32
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1314,
+   "chars_salida": 1314,
+   "prompt_n": 362,
+   "prompt_ms": 6751.912,
+   "gen_n": 321,
+   "gen_ms": 45061.909,
+   "gen_tok_s": 7.1013414012264775,
+   "draft_n": 338,
+   "draft_aceptados": 309,
+   "pared_s": 51.8,
+   "parada": "eos",
+   "i": 33
+  },
+  {
+   "exacto": false,
+   "parecido": 0.9993,
+   "chars_original": 1435,
+   "chars_salida": 1435,
+   "prompt_n": 404,
+   "prompt_ms": 7403.943,
+   "gen_n": 363,
+   "gen_ms": 65506.322,
+   "gen_tok_s": 5.526184175017489,
+   "draft_n": 420,
+   "draft_aceptados": 343,
+   "pared_s": 72.9,
+   "parada": "eos",
+   "i": 34
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1177,
+   "chars_salida": 1177,
+   "prompt_n": 333,
+   "prompt_ms": 4513.61,
+   "gen_n": 292,
+   "gen_ms": 42896.25,
+   "gen_tok_s": 6.7838097735816065,
+   "draft_n": 338,
+   "draft_aceptados": 280,
+   "pared_s": 47.4,
+   "parada": "eos",
+   "i": 35
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1058,
+   "chars_salida": 1058,
+   "prompt_n": 293,
+   "prompt_ms": 5418.036,
+   "gen_n": 252,
+   "gen_ms": 39053.606,
+   "gen_tok_s": 6.427063354917853,
+   "draft_n": 274,
+   "draft_aceptados": 241,
+   "pared_s": 44.5,
+   "parada": "eos",
+   "i": 36
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1191,
+   "chars_salida": 1191,
+   "prompt_n": 306,
+   "prompt_ms": 5618.031,
+   "gen_n": 265,
+   "gen_ms": 38264.646,
+   "gen_tok_s": 6.899319021532304,
+   "draft_n": 274,
+   "draft_aceptados": 254,
+   "pared_s": 43.9,
+   "parada": "eos",
+   "i": 37
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1496,
+   "chars_salida": 1496,
+   "prompt_n": 408,
+   "prompt_ms": 9024.471,
+   "gen_n": 367,
+   "gen_ms": 57894.161,
+   "gen_tok_s": 6.321881061546086,
+   "draft_n": 402,
+   "draft_aceptados": 354,
+   "pared_s": 66.9,
+   "parada": "eos",
+   "i": 38
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1333,
+   "chars_salida": 1333,
+   "prompt_n": 338,
+   "prompt_ms": 8653.737,
+   "gen_n": 297,
+   "gen_ms": 46710.978,
+   "gen_tok_s": 6.336840132099139,
+   "draft_n": 338,
+   "draft_aceptados": 285,
+   "pared_s": 55.4,
+   "parada": "eos",
+   "i": 39
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1392,
+   "chars_salida": 1392,
+   "prompt_n": 356,
+   "prompt_ms": 7241.334,
+   "gen_n": 315,
+   "gen_ms": 55319.029,
+   "gen_tok_s": 5.676166152518693,
+   "draft_n": 338,
+   "draft_aceptados": 303,
+   "pared_s": 62.6,
+   "parada": "eos",
+   "i": 40
+  },
+  {
+   "exacto": true,
+   "parecido": 1.0,
+   "chars_original": 1498,
+   "chars_salida": 1498,
+   "prompt_n": 393,
+   "prompt_ms": 9391.084,
+   "gen_n": 352,
+   "gen_ms": 62847.474,
+   "gen_tok_s": 5.584950001331795,
+   "draft_n": 402,
+   "draft_aceptados": 339,
+   "pared_s": 72.2,
+   "parada": "eos",
+   "i": 41
+  },
+  {
+   "error": "RemoteDisconnected('Remote end closed connection without response')",
+   "chars_original": 1469,
+   "i": 42
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1013,
+   "i": 43
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 983,
+   "i": 44
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1253,
+   "i": 45
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1347,
+   "i": 46
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 542,
+   "i": 47
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1311,
+   "i": 48
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 420,
+   "i": 49
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1103,
+   "i": 50
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1394,
+   "i": 51
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 916,
+   "i": 52
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1262,
+   "i": 53
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1419,
+   "i": 54
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1374,
+   "i": 55
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1289,
+   "i": 56
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 719,
+   "i": 57
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1448,
+   "i": 58
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1451,
+   "i": 59
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1346,
+   "i": 60
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1331,
+   "i": 61
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1404,
+   "i": 62
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1215,
+   "i": 63
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1350,
+   "i": 64
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1457,
+   "i": 65
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1324,
+   "i": 66
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1198,
+   "i": 67
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1543,
+   "i": 68
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1318,
+   "i": 69
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 659,
+   "i": 70
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1246,
+   "i": 71
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1383,
+   "i": 72
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1353,
+   "i": 73
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1411,
+   "i": 74
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1475,
+   "i": 75
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 976,
+   "i": 76
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1160,
+   "i": 77
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1466,
+   "i": 78
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1192,
+   "i": 79
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1423,
+   "i": 80
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1161,
+   "i": 81
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 827,
+   "i": 82
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1135,
+   "i": 83
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1408,
+   "i": 84
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1209,
+   "i": 85
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1418,
+   "i": 86
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1457,
+   "i": 87
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1319,
+   "i": 88
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1226,
+   "i": 89
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1345,
+   "i": 90
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1462,
+   "i": 91
+  },
+  {
+   "error": "URLError(ConnectionRefusedError(111, 'Connection refused'))",
+   "chars_original": 1330,
+   "i": 92
+  }
+ ]
+}

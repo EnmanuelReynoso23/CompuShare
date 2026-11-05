@@ -70,3 +70,60 @@ def test_transcribir_compara_y_guarda(tmp_path):
 def test_transcribir_registra_errores_y_sigue(tmp_path):
     res = tr.transcribir("http://127.0.0.1:9", ["a", "b"], flujos=1, salida_dir=tmp_path)
     assert res["trozos_hechos"] == 2 and res["trozos_con_error"] == 2 and res["trozos_exactos"] == 0
+
+
+def _servidor_falso():
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), _FalsoLlama)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv, f"http://127.0.0.1:{srv.server_address[1]}"
+
+
+def test_si_se_cae_el_servidor_recupera_y_repite_el_trozo(tmp_path, monkeypatch):
+    srv, url = _servidor_falso()
+    original = tr.transcribir_trozo
+    estado = {"caido": False, "llamadas": 0}
+
+    def trozo(u, texto, espera=3600):
+        estado["llamadas"] += 1
+        if texto == "b" and estado["llamadas"] == 2:  # el servidor se cae justo en el trozo "b"
+            estado["caido"] = True
+        if estado["caido"]:
+            raise ConnectionRefusedError("sin llama-server")
+        return original(u, texto, espera)
+
+    def recuperar():
+        estado["caido"] = False  # el maestro lo relanzó
+        return True
+
+    monkeypatch.setattr(tr, "transcribir_trozo", trozo)
+    try:
+        res = tr.transcribir(url, ["a", "b", "c"], salida_dir=tmp_path, recuperar=recuperar)
+    finally:
+        srv.shutdown()
+    assert res["trozos_hechos"] == 3 and res["trozos_con_error"] == 0 and res["trozos_exactos"] == 3
+    assert res["recuperaciones"] == 1 and not res["detenido_sin_servidor"]
+
+
+def test_si_no_se_recupera_para_y_no_cuenta_los_que_faltan(tmp_path):
+    vistos = []
+    res = tr.transcribir("http://127.0.0.1:9", ["a", "b", "c", "d"], salida_dir=tmp_path,
+                         recuperar=lambda: vistos.append(1) or False)
+    assert vistos == [1]  # una sola recuperación intentada, no una por trozo
+    assert res["detenido_sin_servidor"] and res["trozos_hechos"] == 0 and res["trozos_con_error"] == 0
+
+
+def test_retomar_salta_lo_ya_hecho(tmp_path):
+    srv, url = _servidor_falso()
+    try:
+        tr.transcribir(url, ["uno", "dos"], salida_dir=tmp_path)
+        pedidos = []
+        original = tr.transcribir_trozo
+        tr.transcribir_trozo = lambda u, t, espera=3600: pedidos.append(t) or original(u, t, espera)
+        try:
+            res = tr.transcribir(url, ["uno", "dos", "tres"], salida_dir=tmp_path, retomar=True)
+        finally:
+            tr.transcribir_trozo = original
+    finally:
+        srv.shutdown()
+    assert pedidos == ["tres"] and res["retomados"] == 2 and res["trozos_hechos"] == 3
+    assert (tmp_path / "libro_transcrito.txt").read_text(encoding="utf-8") == "uno\n\ndos\n\ntres"

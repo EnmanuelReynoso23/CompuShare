@@ -1,0 +1,92 @@
+{
+ "config": {
+  "rol": "maestro",
+  "nombre": "kaggle-qwen3.5-9b-2-equipos",
+  "rele": "aqui",
+  "tubo_prefijo": "trabajador-",
+  "trabajadores_min": 1,
+  "espera_trabajador_min": 45,
+  "modelo_repo": "unsloth/Qwen3.5-9B-MTP-GGUF",
+  "modelo_archivo": "Qwen3.5-9B-Q8_0.gguf",
+  "modelo_nombre": "Qwen3.5-9B (2 equipos)",
+  "especulativo": "ngram-mod,draft-mtp",
+  "embeber": "",
+  "reordenar": "",
+  "contexto": 16384,
+  "paralelo": 1,
+  "especulativo_alternativas": [
+   "ngram-mod",
+   "draft-mtp",
+   ""
+  ],
+  "solo_transcribir": true,
+  "enjambre": "publico",
+  "duracion_min": 85,
+  "llama_cpp": "b12024",
+  "cloudflared": "2026.10.0"
+ },
+ "etapas": {
+  "codigo": 4.3,
+  "rele": 24.8,
+  "modelo": 51.6,
+  "llama_cpp": 55.8,
+  "esperar_trabajador": 105.9,
+  "llama_server": 152.1,
+  "transcribir": 1644.3
+ },
+ "gpus": [
+  "Tesla T4, 15360 MiB, 7.5, 580.178.04",
+  "Tesla T4, 15360 MiB, 7.5, 580.178.04"
+ ],
+ "rele_publico": "wss://extraordinary-soup-sewing-sussex.trycloudflare.com",
+ "modelo_gb": 9.8,
+ "llama_origen": "binario oficial",
+ "trabajadores": {
+  "trabajador-1": {
+   "vram_gb": 30.0,
+   "rtt_ms": 37.1,
+   "conexion_ms": 667.1
+  }
+ },
+ "elegidos": [
+  "trabajador-1"
+ ],
+ "spec_intentos": [
+  {
+   "spec": "ngram-mod,draft-mtp",
+   "arranco": true
+  }
+ ],
+ "spec_usada": "ngram-mod,draft-mtp",
+ "diagnostico": {
+  "llama": "binario oficial",
+  "equipos": 2,
+  "rtt_ms": "37.1",
+  "tubo_carga_mb": 42.2,
+  "local_tok_s": 3.0,
+  "local_prompt_tok_s": 0.2,
+  "aciertos_mtp": "63/123",
+  "tubo_kb_por_token": 60.5
+ },
+ "llama_caidas": [],
+ "transcripcion": {
+  "trozos_total": 93,
+  "trozos_hechos": 93,
+  "trozos_con_error": 0,
+  "trozos_exactos": 90,
+  "parecido_medio": 1.0,
+  "chars_hechos": 119123,
+  "chars_total": 119123,
+  "prompt_tokens": 32386,
+  "gen_tokens": 28573,
+  "aciertos_especulativa": 0.897,
+  "pared_s": 1644.3,
+  "tok_s_total": 17.38,
+  "flujos": 1,
+  "retomados": 0,
+  "recuperaciones": 0,
+  "detenido_sin_servidor": false,
+  "spec": "ngram-mod,draft-mtp",
+  "tubo_mb": 18087.3
+ }
+}

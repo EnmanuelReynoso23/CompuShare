@@ -121,6 +121,34 @@ def resumir(trozos_total: list[str], filas: list[dict[str, Any] | None], pared_s
     }
 
 
+def esperar_servidor(url: str, espera_s: float = 900, cada_s: float = 5) -> bool:
+    """Espera a que llama-server vuelva a responder /health (por ejemplo mientras el maestro lo relanza
+    tras la caída de un trabajador). True si volvió antes de `espera_s`."""
+    fin = time.time() + espera_s
+    while time.time() < fin:
+        try:
+            with urllib.request.urlopen(url.rstrip("/") + "/health", timeout=5) as r:
+                if r.status == 200:
+                    return True
+        except Exception:  # noqa: BLE001 - todavía no está
+            pass
+        time.sleep(cada_s)
+    return False
+
+
+def _ya_hechos(carpeta: Path | None, textos: list[str]) -> dict[int, dict[str, Any]]:
+    """Trozos bien hechos en una corrida anterior (transcripcion.json), para retomar sin repetirlos."""
+    if not carpeta or not (carpeta / "transcripcion.json").exists():
+        return {}
+    try:
+        previos = json.loads((carpeta / "transcripcion.json").read_text(encoding="utf-8"))["trozos"]
+    except (ValueError, KeyError, OSError):
+        return {}
+    return {f["i"]: f for f in previos
+            if "error" not in f and 0 <= f.get("i", -1) < len(textos)
+            and f.get("chars_original") == len(textos[f["i"]].strip())}
+
+
 def transcribir(
     url: str,
     textos: list[str],
@@ -128,22 +156,38 @@ def transcribir(
     salida_dir: str | Path | None = None,
     limite_s: float | None = None,
     al_terminar_trozo: Callable[[int, dict[str, Any]], None] | None = None,
+    recuperar: Callable[[], bool] | None = None,
+    reintentos: int = 2,
+    retomar: bool = False,
 ) -> dict[str, Any]:
     """Transcribe `textos` con `flujos` peticiones a la vez (el maestro debe tener `--parallel` >= flujos).
 
     Si hay `salida_dir`, guarda `transcripcion.json` y `libro_transcrito.txt` después de cada trozo:
     si algo se corta, queda lo hecho hasta ahí. `limite_s` deja de empezar trozos nuevos pasado ese tiempo.
+
+    Si un trozo falla y hay `recuperar`, se llama a `recuperar()` (una sola vez aunque fallen varios flujos a la vez) y, si
+    devuelve True, se repite el trozo hasta `reintentos` veces. Si devuelve False se deja de empezar trozos:
+    los que faltan no se marcan como hechos (el 4-nov-2026 en Kaggle, sin esto, 50 trozos fallaron en
+    segundos tras caerse el trabajador). `retomar` salta los trozos ya bien hechos en `salida_dir`.
     """
     filas: list[dict[str, Any] | None] = [None] * len(textos)
     candado = threading.Lock()
+    candado_recuperar = threading.Lock()
+    caidas = {"n": 0, "recuperaciones": 0}
+    parar = threading.Event()
     t_ini = time.time()
     carpeta = Path(salida_dir) if salida_dir else None
     if carpeta:
         carpeta.mkdir(parents=True, exist_ok=True)
+    previos = _ya_hechos(carpeta, textos) if retomar else {}
+    for i, fila in previos.items():
+        filas[i] = fila
 
     def guardar() -> dict[str, Any]:
         res = resumir(textos, filas, time.time() - t_ini)
         res["flujos"] = flujos
+        res["retomados"] = len(previos)
+        res["recuperaciones"] = caidas["recuperaciones"]
         if carpeta:
             hechos = [f for f in filas if f]
             (carpeta / "transcripcion.json").write_text(
@@ -152,13 +196,36 @@ def transcribir(
                 "\n\n".join(f["salida"] for f in filas if f), encoding="utf-8")
         return res
 
+    def intentar_recuperar(caida_vista: int) -> bool:
+        with candado_recuperar:
+            if caidas["n"] != caida_vista:  # otro flujo ya recuperó esta caída
+                return not parar.is_set()
+            if recuperar is None:  # sin forma de recuperar: se anota el error y se sigue con el resto
+                return False
+            caidas["n"] += 1
+            if parar.is_set() or not recuperar():
+                parar.set()
+                return False
+            caidas["recuperaciones"] += 1
+            return True
+
     def uno(i: int) -> None:
+        if filas[i] is not None or parar.is_set():
+            return
         if limite_s is not None and time.time() - t_ini > limite_s:
             return
-        try:
-            fila = transcribir_trozo(url, textos[i])
-        except Exception as e:  # noqa: BLE001 - se registra y se sigue con el resto
-            fila = {"error": repr(e)[:300], "salida": "", "chars_original": len(textos[i])}
+        for intento in range(reintentos + 1):
+            caida_vista = caidas["n"]
+            try:
+                fila = transcribir_trozo(url, textos[i])
+                break
+            except Exception as e:  # noqa: BLE001 - se registra y se sigue con el resto
+                fila = {"error": repr(e)[:300], "salida": "", "chars_original": len(textos[i])}
+                if intento == reintentos or not intentar_recuperar(caida_vista):
+                    break
+                fila["reintento"] = intento + 1
+        if "error" in fila and parar.is_set():
+            return  # sin servidor: no se cuenta como hecho, queda para retomar
         fila["i"] = i
         with candado:
             filas[i] = fila
@@ -168,4 +235,6 @@ def transcribir(
 
     with ThreadPoolExecutor(max(1, flujos)) as ex:
         list(ex.map(uno, range(len(textos))))
-    return guardar()
+    res = guardar()
+    res["detenido_sin_servidor"] = parar.is_set()
+    return res

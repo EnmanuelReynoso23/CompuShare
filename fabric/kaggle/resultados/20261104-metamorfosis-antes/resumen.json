@@ -1,0 +1,87 @@
+{
+ "config": {
+  "rol": "maestro",
+  "nombre": "kaggle-qwen3.5-9b-2-equipos",
+  "rele": "aqui",
+  "tubo_prefijo": "trabajador-",
+  "trabajadores_min": 1,
+  "espera_trabajador_min": 45,
+  "modelo_repo": "unsloth/Qwen3.5-9B-MTP-GGUF",
+  "modelo_archivo": "Qwen3.5-9B-Q8_0.gguf",
+  "modelo_nombre": "Qwen3.5-9B (2 equipos)",
+  "especulativo": "ngram-mod,draft-mtp",
+  "embeber": "",
+  "reordenar": "",
+  "contexto": 16384,
+  "paralelo": 1,
+  "especulativo_alternativas": [
+   "ngram-mod",
+   "draft-mtp",
+   ""
+  ],
+  "solo_transcribir": true,
+  "enjambre": "publico",
+  "duracion_min": 85,
+  "llama_cpp": "b12024",
+  "cloudflared": "2026.10.0"
+ },
+ "etapas": {
+  "codigo": 5.3,
+  "rele": 11.2,
+  "modelo": 51.0,
+  "llama_cpp": 56.4,
+  "esperar_trabajador": 62.3,
+  "llama_server": 175.2,
+  "transcribir": 2416.9
+ },
+ "gpus": [
+  "Tesla T4, 15360 MiB, 7.5, 580.178.04",
+  "Tesla T4, 15360 MiB, 7.5, 580.178.04"
+ ],
+ "rele_publico": "wss://overnight-audit-muscle-supplement.trycloudflare.com",
+ "modelo_gb": 9.8,
+ "llama_origen": "binario oficial",
+ "trabajadores": {
+  "trabajador-1": {
+   "vram_gb": 30.0,
+   "rtt_ms": 664.1
+  }
+ },
+ "elegidos": [
+  "trabajador-1"
+ ],
+ "spec_intentos": [
+  {
+   "spec": "ngram-mod,draft-mtp",
+   "arranco": true
+  }
+ ],
+ "spec_usada": "ngram-mod,draft-mtp",
+ "diagnostico": {
+  "llama": "binario oficial",
+  "equipos": 2,
+  "rtt_ms": "664.1",
+  "tubo_carga_mb": 42.6,
+  "local_tok_s": 1.1,
+  "local_prompt_tok_s": 0.2,
+  "aciertos_mtp": "61/135",
+  "tubo_kb_por_token": 382.9
+ },
+ "transcripcion": {
+  "trozos_total": 93,
+  "trozos_hechos": 93,
+  "trozos_con_error": 51,
+  "trozos_exactos": 39,
+  "parecido_medio": 0.9999,
+  "chars_hechos": 119123,
+  "chars_total": 119123,
+  "prompt_tokens": 15141,
+  "gen_tokens": 13419,
+  "aciertos_especulativa": 0.888,
+  "pared_s": 2416.9,
+  "tok_s_total": 5.55,
+  "flujos": 1,
+  "spec": "ngram-mod,draft-mtp",
+  "tubo_mb": 14910.1
+ }
+}
