@@ -55,14 +55,18 @@ Detalles:
   escrito al TCP (por FULL, REF o DELTA) se inserta o se mueve al final (más reciente). Si hay más de
   **32** entradas o suman más de **64 MiB**, se sacan las más viejas hasta cumplir. Como los dos lados ven
   la misma secuencia de grafos, las cachés coinciden sin mensajes extra.
+- Usar una entrada como base de un DELTA **no** la reordena; solo REF, FULL y DELTA (el grafo nuevo) la
+  marcan como más reciente. Un grafo que sale en RAW no entra en la caché.
+- Un mensaje WS del códec puede pesar hasta 80 MiB (un grafo completo); el tubo acepta ese tamaño.
 - Si el decodificador recibe un REF o DELTA con un hash que no tiene, o un tipo desconocido, es un error:
   cierra la conexión (llama.cpp reintenta / el maestro relanza).
 - **Q8_0** (opcional, con pérdida, apagado por defecto: `compushare servir --activaciones q8`):
   - Solo para `SET_TENSOR` (6) con: ya pasó al menos un `GRAPH_COMPUTE` en la conexión (así los pesos de
     la carga nunca se tocan), `rpc_tensor.type == 0` (F32, `u32` en el byte 8 del payload), datos
-    `= tamaño - 304` múltiplo de 4, al menos 1.024 floats, y **todos los valores finitos** (la máscara de
+    `= tamaño - 305` múltiplo de 4, al menos 1.024 floats, y **todos los valores finitos** (la máscara de
     atención lleva `-inf`: va cruda).
-  - Cabecera = los primeros 304 bytes del payload (`rpc_tensor` 296 + `offset` u64). `hlen = 304`.
+  - Cabecera = los primeros 305 bytes del payload (`rpc_tensor` 296 + `cache_flag` u8 + `offset` u64, como
+    en `serialize_set_tensor` de b11434). `hlen = 305`. El decodificador no interpreta la cabecera: usa `hlen`.
   - Bloques de 32 floats: `d = amax/127` (en float32), escala guardada como float16 (IEEE 754 half, LE),
     `q[i] = round_half_away_from_zero(x[i] / d)` acotado a [-127, 127] (si `d == 0`, todo 0). El último bloque
     se rellena con ceros. Cada bloque son 2 + 32 = 34 bytes.

@@ -10,6 +10,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -19,6 +20,7 @@ import (
 	"github.com/coder/websocket/wsjson"
 
 	"github.com/EnmanuelReynoso23/CompuShare/go/pkg/protocolo"
+	"github.com/EnmanuelReynoso23/CompuShare/go/pkg/rpccodec"
 	"github.com/EnmanuelReynoso23/CompuShare/go/pkg/tubo"
 )
 
@@ -40,6 +42,10 @@ type Rele struct {
 	TareaVenceS    float64
 	LatidoVenceS   float64
 	TuboPuertoBase int
+	// CodecActivo permite el códec rpc1 hacia los trabajadores que lo anuncian
+	// (FABRIC_CODEC=0 lo apaga). CodecQ8 activa la cuantización Q8_0 (FABRIC_CODEC_Q8=1).
+	CodecActivo bool
+	CodecQ8     bool
 
 	mu              sync.RWMutex
 	pares           map[string]*Par
@@ -68,6 +74,8 @@ func Nuevo(clave string, puerto int) *Rele {
 		TareaVenceS:    900.0,
 		LatidoVenceS:   60.0,
 		TuboPuertoBase: 50100,
+		CodecActivo:    os.Getenv("FABRIC_CODEC") != "0",
+		CodecQ8:        os.Getenv("FABRIC_CODEC_Q8") == "1",
 		pares:          make(map[string]*Par),
 		tareas:         make(map[string]*Tarea),
 		salas:          make(map[string][]*protocolo.MensajeChat),
@@ -361,6 +369,7 @@ func (r *Rele) ofrecer(ws *websocket.Conn, primero map[string]any) {
 	}
 
 	oferta := NuevaOferta(nombre, ws, puertoElegido, listener, info)
+	oferta.Codecs = codecsAnunciados(primero)
 	r.ofertas[nombre] = oferta
 	r.mu.Unlock()
 
@@ -388,6 +397,19 @@ func (r *Rele) ofrecer(ws *websocket.Conn, primero map[string]any) {
 	}
 
 	r.retirarOferta(nombre, oferta)
+}
+
+// codecsAnunciados lee el campo "codecs" del ofrezco; un trabajador viejo no lo manda.
+func codecsAnunciados(m map[string]any) map[string]struct{} {
+	out := make(map[string]struct{})
+	if lista, ok := m["codecs"].([]any); ok {
+		for _, v := range lista {
+			if s, ok := v.(string); ok {
+				out[s] = struct{}{}
+			}
+		}
+	}
+	return out
 }
 
 func (r *Rele) retirarOferta(nombre string, oferta *Oferta) {
@@ -424,10 +446,16 @@ func (r *Rele) abrirTubo(oferta *Oferta, tcpConn net.Conn) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	codec := ""
+	if _, ok := oferta.Codecs[protocolo.CodecRPC1]; ok && r.CodecActivo {
+		codec = protocolo.CodecRPC1
+	}
+
 	oferta.ControlMu.Lock()
 	err := wsjson.Write(ctx, oferta.Control, protocolo.Abre{
-		T:  "abre",
-		ID: ident,
+		T:     "abre",
+		ID:    ident,
+		Codec: codec,
 	})
 	oferta.ControlMu.Unlock()
 
@@ -460,7 +488,14 @@ func (r *Rele) abrirTubo(oferta *Oferta, tcpConn net.Conn) {
 		close(res.Terminado)
 	}()
 
-	tubo.Canalizar(context.Background(), res.WS, tcpConn, &r.tuboBytes)
+	var enc *rpccodec.Codificador
+	if codec == protocolo.CodecRPC1 {
+		enc = rpccodec.NuevoCodificador(r.CodecQ8)
+	}
+	tubo.CanalizarCodec(context.Background(), res.WS, tcpConn, &r.tuboBytes, enc, nil)
+	if enc != nil {
+		log.Printf("tubo %s: %s", oferta.Nombre, enc.Estadisticas())
+	}
 }
 
 func (r *Rele) atenderPeer(w http.ResponseWriter, req *http.Request) {

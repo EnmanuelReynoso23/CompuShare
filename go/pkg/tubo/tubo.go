@@ -16,6 +16,7 @@ import (
 
 	"github.com/EnmanuelReynoso23/CompuShare/go/pkg/descubrir"
 	"github.com/EnmanuelReynoso23/CompuShare/go/pkg/protocolo"
+	"github.com/EnmanuelReynoso23/CompuShare/go/pkg/rpccodec"
 )
 
 type Tubo struct {
@@ -26,8 +27,10 @@ type Tubo struct {
 	Host         string
 	Info         map[string]any
 	PuertoRemoto int
-	Bytes        atomic.Int64
-	Conexiones   atomic.Int64
+	// SinCodecs hace que el tubo no anuncie rpc1 (simula un trabajador anterior).
+	SinCodecs  bool
+	Bytes      atomic.Int64
+	Conexiones atomic.Int64
 
 	mu    sync.Mutex
 	listo chan struct{}
@@ -142,6 +145,9 @@ func (t *Tubo) unaSesion(ctx context.Context) error {
 		Nombre: t.Nombre,
 		Info:   t.Info,
 	}
+	if !t.SinCodecs {
+		ofrezco.Codecs = []string{protocolo.CodecRPC1}
+	}
 	if err := wsjson.Write(ctx, c, ofrezco); err != nil {
 		return err
 	}
@@ -166,12 +172,24 @@ func (t *Tubo) unaSesion(ctx context.Context) error {
 			return err
 		}
 		if m.T == "abre" && m.ID != "" {
-			go t.unir(ctx, url, m.ID)
+			go t.unir(ctx, url, m.ID, m.Codec)
 		}
 	}
 }
 
-func (t *Tubo) unir(ctx context.Context, url string, ident string) {
+func (t *Tubo) unir(ctx context.Context, url string, ident string, codec string) {
+	var dec *rpccodec.Decodificador
+	limite := int64(protocolo.MaxMensajeBytes)
+	switch codec {
+	case "":
+	case protocolo.CodecRPC1:
+		dec = rpccodec.NuevoDecodificador()
+		limite = rpccodec.MaxMensajeCodec
+	default:
+		log.Printf("códec %q desconocido en el canal %s; se cierra", codec, ident)
+		return
+	}
+
 	destino := net.JoinHostPort(t.Host, strconv.Itoa(t.Puerto))
 	tcpConn, err := net.Dial("tcp", destino)
 	if err != nil {
@@ -194,7 +212,7 @@ func (t *Tubo) unir(ctx context.Context, url string, ident string) {
 		return
 	}
 	defer ws.Close(websocket.StatusNormalClosure, "")
-	ws.SetReadLimit(protocolo.MaxMensajeBytes)
+	ws.SetReadLimit(limite)
 
 	datos := protocolo.Datos{
 		T:     "datos",
@@ -206,5 +224,5 @@ func (t *Tubo) unir(ctx context.Context, url string, ident string) {
 		return
 	}
 
-	Canalizar(ctx, ws, tcpConn, &t.Bytes)
+	CanalizarCodec(ctx, ws, tcpConn, &t.Bytes, nil, dec)
 }

@@ -24,6 +24,7 @@ from fabric import descubrir, rpc_codec
 log = logging.getLogger("tubo")
 TROZO = 256 * 1024
 MAX_MENSAJE = 8 * 1024 * 1024
+MAX_MENSAJE_CODEC = 80 * 1024 * 1024  # un registro del códec puede llevar un grafo entero (como en Go)
 
 
 class Tubo:
@@ -97,7 +98,8 @@ class Tubo:
             return
         self.conexiones += 1
         try:
-            async with connect(url, max_size=MAX_MENSAJE, open_timeout=30, compression=None) as ws:
+            limite = MAX_MENSAJE_CODEC if decodificador is not None else MAX_MENSAJE
+            async with connect(url, max_size=limite, open_timeout=30, compression=None) as ws:
                 await ws.send(json.dumps({"t": "datos", "clave": self.clave, "id": ident}))
                 await canalizar(ws, lector, escritor, self, decodificador)
         except (OSError, ConnectionClosed, rpc_codec.ErrorCodec) as e:

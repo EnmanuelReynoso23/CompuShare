@@ -23,6 +23,8 @@ type Oferta struct {
 	Esperando map[string]chan CanalizadoResult
 	EspMu     sync.Mutex
 	Info      map[string]any
+	// Codecs son los códecs que el trabajador anunció en su ofrezco.
+	Codecs map[string]struct{}
 }
 
 func NuevaOferta(nombre string, control *websocket.Conn, puerto int, listener net.Listener, info map[string]any) *Oferta {
@@ -36,6 +38,7 @@ func NuevaOferta(nombre string, control *websocket.Conn, puerto int, listener ne
 		Listener:  listener,
 		Esperando: make(map[string]chan CanalizadoResult),
 		Info:      info,
+		Codecs:    make(map[string]struct{}),
 	}
 }
 

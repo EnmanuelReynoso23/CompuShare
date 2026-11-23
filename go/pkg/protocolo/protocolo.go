@@ -155,6 +155,9 @@ type Ofrezco struct {
 	Clave  string         `json:"clave"`
 	Nombre string         `json:"nombre"`
 	Info   map[string]any `json:"info,omitempty"`
+	// Codecs lista los códecs de transporte que el trabajador entiende (p. ej. "rpc1").
+	// Un trabajador viejo no lo manda.
+	Codecs []string `json:"codecs,omitempty"`
 }
 
 // Listo enviado por el relé cuando el tubo está preparado.
@@ -167,7 +170,12 @@ type Listo struct {
 type Abre struct {
 	T  string `json:"t"`
 	ID string `json:"id"`
+	// Codec es el códec de este canal ("rpc1"); vacío significa crudo.
+	Codec string `json:"codec,omitempty"`
 }
+
+// CodecRPC1 es el códec de transporte de ggml-rpc descrito en docs/CODEC-RPC.md.
+const CodecRPC1 = "rpc1"
 
 // Datos enviado por el trabajador al abrir el WebSocket de datos para un ID.
 type Datos struct {
