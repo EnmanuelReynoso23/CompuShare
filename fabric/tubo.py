@@ -19,7 +19,7 @@ from typing import Any
 from websockets.asyncio.client import connect
 from websockets.exceptions import ConnectionClosed
 
-from fabric import descubrir
+from fabric import descubrir, rpc_codec
 
 log = logging.getLogger("tubo")
 TROZO = 256 * 1024
@@ -28,8 +28,10 @@ MAX_MENSAJE = 8 * 1024 * 1024
 
 class Tubo:
     def __init__(self, rele: str, clave: str, nombre: str, puerto: int, host: str = "127.0.0.1",
-                 info: dict | None = None) -> None:
+                 info: dict | None = None, codec: bool = True) -> None:
         self.rele = rele
+        # Con FABRIC_PERFIL=1 no se negocia el códec: el camino instrumentado va crudo.
+        self.codec = codec and os.environ.get("FABRIC_PERFIL") != "1"
         self.clave = clave
         self.nombre = nombre
         self.puerto = puerto
@@ -59,7 +61,10 @@ class Tubo:
     async def _una_sesion(self) -> None:
         url = await self._url()
         async with connect(url, max_size=MAX_MENSAJE, open_timeout=30, compression=None) as control:
-            await control.send(json.dumps({"t": "ofrezco", "clave": self.clave, "nombre": self.nombre, "info": self.info}))
+            oferta = {"t": "ofrezco", "clave": self.clave, "nombre": self.nombre, "info": self.info}
+            if self.codec:
+                oferta["codecs"] = ["rpc1"]
+            await control.send(json.dumps(oferta))
             hola = json.loads(await asyncio.wait_for(control.recv(), timeout=20))
             if hola.get("t") != "listo":
                 raise RuntimeError(f"el relé no aceptó el tubo: {hola}")
@@ -69,7 +74,7 @@ class Tubo:
             async for crudo in control:
                 m = json.loads(crudo)
                 if m.get("t") == "abre":
-                    asyncio.create_task(self._unir(url, str(m["id"])))
+                    asyncio.create_task(self._unir(url, str(m["id"]), m.get("codec")))
                 elif os.environ.get("FABRIC_PERFIL") == "1" and m.get("t") == "perfil_fase":
                     from fabric import perfil_contador
                     if m.get("accion") == "iniciar":
@@ -77,7 +82,14 @@ class Tubo:
                     elif m.get("accion") == "terminar":
                         perfil_contador.terminar_fase_global(m["nombre"])
 
-    async def _unir(self, url: str, ident: str) -> None:
+    async def _unir(self, url: str, ident: str, codec: str | None = None) -> None:
+        # El códec de esta conexión es exactamente el que diga `abre` (ausente = crudo).
+        decodificador = None
+        if codec is not None:
+            if codec != "rpc1" or not self.codec:
+                log.error("el relé pide el códec %r y este tubo no lo entiende", codec)
+                return
+            decodificador = rpc_codec.Decodificador()
         try:
             lector, escritor = await asyncio.open_connection(self.host, self.puerto)
         except OSError as e:
@@ -87,14 +99,15 @@ class Tubo:
         try:
             async with connect(url, max_size=MAX_MENSAJE, open_timeout=30, compression=None) as ws:
                 await ws.send(json.dumps({"t": "datos", "clave": self.clave, "id": ident}))
-                await canalizar(ws, lector, escritor, self)
-        except (OSError, ConnectionClosed) as e:
+                await canalizar(ws, lector, escritor, self, decodificador)
+        except (OSError, ConnectionClosed, rpc_codec.ErrorCodec) as e:
             log.warning("conexión del tubo cerrada: %s", e)
         finally:
             escritor.close()
 
 
-async def canalizar(ws: Any, lector: asyncio.StreamReader, escritor: asyncio.StreamWriter, cuenta: Any = None) -> None:
+async def canalizar(ws: Any, lector: asyncio.StreamReader, escritor: asyncio.StreamWriter, cuenta: Any = None,
+                    decodificador: Any = None) -> None:
     if os.environ.get("FABRIC_PERFIL") == "1":
         from fabric.perfil_contador import canalizar_instrumentado
         await canalizar_instrumentado(ws, lector, escritor, TROZO, "tubo", cuenta)
@@ -111,12 +124,17 @@ async def canalizar(ws: Any, lector: asyncio.StreamReader, escritor: asyncio.Str
             if isinstance(trozo, bytes):
                 if cuenta is not None:
                     cuenta.bytes += len(trozo)
-                escritor.write(trozo)
-                await escritor.drain()
+                plano = decodificador.decodificar(trozo) if decodificador is not None else trozo
+                if plano:
+                    escritor.write(plano)
+                    await escritor.drain()
 
     tareas = [asyncio.create_task(hacia_ws()), asyncio.create_task(hacia_tcp())]
     try:
-        await asyncio.wait(tareas, return_when=asyncio.FIRST_COMPLETED)
+        hechas, _ = await asyncio.wait(tareas, return_when=asyncio.FIRST_COMPLETED)
+        for t in hechas:
+            if not t.cancelled() and t.exception() is not None:
+                raise t.exception()  # p. ej. ErrorCodec: que llegue a _unir y cierre la conexión
     finally:
         for t in tareas:
             t.cancel()

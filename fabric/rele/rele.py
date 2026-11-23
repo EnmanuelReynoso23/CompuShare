@@ -50,6 +50,11 @@ from websockets.exceptions import ConnectionClosed
 from websockets.http11 import Request, Response
 from websockets.protocol import State
 
+try:
+    from fabric import rpc_codec
+except ImportError:  # la imagen Docker copia solo rele.py: sin el paquete no hay códec
+    rpc_codec = None
+
 CLAVE = os.environ.get("FABRIC_CLAVE", "")
 PUERTO = int(os.environ.get("PUERTO", "8095"))
 MAX_CONEXIONES = int(os.environ.get("MAX_CONEXIONES", "300"))
@@ -112,6 +117,7 @@ class Oferta:
     control: Any
     puerto: int
     servidor: Any = None
+    codecs: tuple[str, ...] = ()  # lo que el trabajador dice entender en `ofrezco` (p. ej. "rpc1")
     abiertos: int = 0
     esperando: dict[str, asyncio.Future] = field(default_factory=dict)
     info: dict = field(default_factory=dict)  # lo que el trabajador dice prestar (p. ej. vram_gb)
@@ -424,7 +430,8 @@ class Rele:
         if m.get("t") == "ofrezco":
             info = m.get("info") if isinstance(m.get("info"), dict) else {}
             info = {str(k)[:30]: v for k, v in list(info.items())[:10] if isinstance(v, (int, float, str))}
-            await self.ofrecer(ws, str(m.get("nombre") or ""), info)
+            codecs = tuple(c for c in (m.get("codecs") or []) if isinstance(c, str))[:8]
+            await self.ofrecer(ws, str(m.get("nombre") or ""), info, codecs)
         elif m.get("t") == "datos":
             esperando = next((o.esperando.pop(str(m.get("id")), None) for o in self.ofertas.values()
                               if str(m.get("id")) in o.esperando), None)
@@ -437,7 +444,8 @@ class Rele:
         else:
             await ws.close(1008, "tubo inválido")
 
-    async def ofrecer(self, ws: ServerConnection, nombre: str, info: dict | None = None) -> None:
+    async def ofrecer(self, ws: ServerConnection, nombre: str, info: dict | None = None,
+                      codecs: tuple[str, ...] = ()) -> None:
         if not ENJAMBRE_VALIDO.match(nombre):
             await ws.close(1008, "nombre inválido")
             return
@@ -446,7 +454,7 @@ class Rele:
             vieja.servidor.close()
         usados = {o.puerto for o in self.ofertas.values()}
         puerto = next(p for p in range(TUBO_PUERTO_BASE, TUBO_PUERTO_BASE + 100) if p not in usados)
-        oferta = Oferta(nombre=nombre, control=ws, puerto=puerto, info=info or {})
+        oferta = Oferta(nombre=nombre, control=ws, puerto=puerto, info=info or {}, codecs=tuple(codecs))
         oferta.servidor = await asyncio.start_server(
             lambda lector, escritor: self.abrir_tubo(oferta, lector, escritor), "127.0.0.1", puerto
         )
@@ -470,8 +478,12 @@ class Rele:
         ident = secrets.token_hex(8)
         futuro: asyncio.Future = asyncio.get_running_loop().create_future()
         oferta.esperando[ident] = futuro
+        codec = "rpc1" if codec_activo() and "rpc1" in oferta.codecs else None
+        abre: dict[str, Any] = {"t": "abre", "id": ident}
+        if codec:
+            abre["codec"] = codec  # sin este campo el tubo viaja crudo, como antes
         try:
-            await oferta.control.send(json.dumps({"t": "abre", "id": ident}))
+            await oferta.control.send(json.dumps(abre))
             ws, terminado = await asyncio.wait_for(futuro, timeout=30)
         except (asyncio.TimeoutError, asyncio.CancelledError, ConnectionClosed):
             oferta.esperando.pop(ident, None)
@@ -479,19 +491,25 @@ class Rele:
             return
         oferta.abiertos += 1
         try:
-            await self.canalizar(ws, lector, escritor)
+            await self.canalizar(ws, lector, escritor, codec)
         finally:
             oferta.abiertos -= 1
             terminado.set()
 
-    async def canalizar(self, ws: Any, lector: asyncio.StreamReader, escritor: asyncio.StreamWriter) -> None:
+    async def canalizar(self, ws: Any, lector: asyncio.StreamReader, escritor: asyncio.StreamWriter,
+                        codec: str | None = None) -> None:
         if os.environ.get("FABRIC_PERFIL") == "1":
             from fabric.perfil_contador import canalizar_instrumentado
             await canalizar_instrumentado(ws, lector, escritor, TUBO_TROZO, "rele", self)
             return
+        cod = rpc_codec.Codificador(q8=q8_activo()) if codec == "rpc1" and rpc_codec is not None else None
 
         async def hacia_ws() -> None:
             while trozo := await lector.read(TUBO_TROZO):
+                if cod is not None:
+                    trozo = cod.codificar(trozo)  # solo el sentido relé -> tubo se codifica
+                    if not trozo:
+                        continue
                 self.tubo_bytes += len(trozo)
                 await ws.send(trozo)
 
@@ -509,6 +527,9 @@ class Rele:
             for t in tareas:
                 t.cancel()
             await asyncio.gather(*tareas, return_exceptions=True)
+            if cod is not None:
+                log.info("códec rpc1: %d -> %d bytes (ahorro %.1f %%)", cod.estad.crudo, cod.estad.enviado,
+                         100 * cod.estad.ahorro())
             escritor.close()
             await ws.close()
 
@@ -558,6 +579,16 @@ class Rele:
         cabeceras = Headers([("Content-Type", "application/json"), ("Content-Length", str(len(cuerpo))),
                              ("Access-Control-Allow-Origin", "*")])
         return Response(HTTPStatus.OK.value, "OK", cabeceras, cuerpo)
+
+
+def codec_activo() -> bool:
+    """El códec rpc1 se usa salvo con FABRIC_CODEC=0 o con el perfilado instrumentado (FABRIC_PERFIL=1)."""
+    return rpc_codec is not None and os.environ.get("FABRIC_CODEC", "1") != "0" \
+        and os.environ.get("FABRIC_PERFIL") != "1"
+
+
+def q8_activo() -> bool:
+    return os.environ.get("FABRIC_CODEC_Q8") == "1"
 
 
 def leer_avance() -> dict[str, Any] | None:
