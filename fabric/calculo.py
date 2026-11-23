@@ -289,6 +289,112 @@ def elegir_optimo(
     return mejor
 
 
+# ── Longitud del borrador (γ*) con el ancho de banda del enlace ─────────────────────────────────
+# PREDICCIÓN, no medición: sale de la fórmula de E(alfa, γ) y de un tiempo por ronda estimado.
+# Una ronda de decodificación especulativa valida γ borradores + 1 token en un solo lote. Lo que
+# cruza cada enlace por ronda son γ+1 activaciones en cada sentido (y el grafo, si se reenvía).
+
+BYTES_VALOR_F32 = 4.0
+BYTES_VALOR_Q8 = 34 / 32  # 1,0625 bytes por valor: bloques de 32 valores en 34 bytes
+BYTES_POR_TENSOR_GRAFO = 296  # ESTIMACIÓN: bytes que llama.cpp RPC reenvía por tensor del grafo
+TENSORES_GRAFO_POR_CAPA = 33  # ESTIMACIÓN: 296 B x 33 x 32 capas = 312 KB, cerca de los 315 KB medidos
+GAMMA_MAX_POR_DEFECTO = 16
+
+
+def bytes_grafo_sin_codec(capas: int) -> float:
+    """Bytes del grafo que se reenvían por ronda sin códec (grafo no reutilizado). ESTIMACIÓN."""
+    return BYTES_POR_TENSOR_GRAFO * TENSORES_GRAFO_POR_CAPA * capas
+
+
+@dataclass(frozen=True)
+class Ventana:
+    gamma: int  # longitud del borrador que maximiza tok/s predichos
+    tok_s: float  # tok/s predichos con ese gamma
+    tok_s_sin_especulativa: float  # tok/s predichos con gamma = 0 (una palabra por ronda)
+    tabla: list[dict] = field(default_factory=list)  # una fila por gamma, para el log y el informe
+
+
+def ronda_especulativa(
+    gamma: int,
+    *,
+    alfa: float,
+    rtt_ms: float,
+    bajada_mbps: float,
+    subida_mbps: float,
+    ms_verificar: float,
+    d_modelo: int,
+    bytes_por_valor: float = BYTES_VALOR_F32,
+    bytes_grafo: float = 0.0,
+    costo_borrador: float = 0.0,
+) -> dict:
+    """Una fila de la tabla: tokens esperados y tiempo de ronda con un gamma dado.
+
+    Tiempo de ronda = ida y vuelta (una por ronda) + bytes del enlace / ancho de banda + verificar.
+    Los dos sentidos van uno detrás del otro (el maestro manda la activación y espera la salida), así
+    que se suman; cada sentido usa el enlace más lento de su dirección (`bajada_mbps` y `subida_mbps`
+    son los mínimos entre los trabajadores usados). `bytes_grafo` es lo que se reenvía por enlace y
+    por ronda, repartido en partes iguales entre los dos sentidos. `costo_borrador` es la fracción de
+    una pasada que cuesta cada palabra adivinada (0 con ngram-mod; MTP medido ~0,28 en MATEMATICA.md).
+    """
+    esperados = palabras_por_pasada(alfa, gamma)
+    activacion = (gamma + 1) * d_modelo * bytes_por_valor  # por sentido
+    por_sentido = activacion + bytes_grafo / 2
+    ms_bw = 1000 * por_sentido * 8 / (bajada_mbps * 1e6) + 1000 * por_sentido * 8 / (subida_mbps * 1e6)
+    ms_base = rtt_ms + ms_bw + ms_verificar
+    ms_ronda = ms_base * (1 + costo_borrador * gamma)
+    tok_s = 1000 * esperados / ms_ronda if ms_ronda > 0 else math.inf
+    return {
+        "gamma": gamma,
+        "esperados": esperados,
+        "bytes_ronda": 2 * por_sentido,
+        "ms_ronda": ms_ronda,
+        "tok_s": tok_s,
+    }
+
+
+def ventana_optima(
+    *,
+    alfa: float,
+    rtt_ms: float,
+    bajada_mbps: float,
+    subida_mbps: float,
+    ms_verificar: float,
+    d_modelo: int,
+    bytes_por_valor: float = BYTES_VALOR_F32,
+    bytes_grafo: float = 0.0,
+    costo_borrador: float = 0.0,
+    gamma_max: int = GAMMA_MAX_POR_DEFECTO,
+) -> Ventana:
+    """Elige el gamma (0..gamma_max) que maximiza los tok/s PREDICHOS de la especulativa.
+
+    alfa: probabilidad de que cada token adivinado sea el que el modelo habría elegido. Es un supuesto
+    (el maestro usa 0,75; medido 89,7 % con ngram-mod,draft-mtp en Kaggle); no se mide aquí.
+    rtt_ms: ida y vuelta de la cadena (suma de los trabajadores usados, como en tiempo_por_palabra).
+    bajada_mbps / subida_mbps: maestro->trabajador / trabajador->maestro del enlace más lento.
+    ms_verificar: tiempo de verificar un lote de tokens; con lectura de pesos dominada por la memoria
+    se aproxima por el cálculo de una pasada (ms_calculo de tiempo_por_palabra).
+
+    Con alfa = 0 cada ronda da 1 token y gamma = 0 es lo mejor. Con ancho de banda infinito y sin costo
+    de borrador, gamma crece hasta gamma_max. En empate gana el gamma menor.
+    """
+    if not 0 <= alfa <= 1:
+        raise ValueError("alfa debe estar entre 0 y 1")
+    if gamma_max < 0:
+        raise ValueError("gamma_max no puede ser negativo")
+    if bajada_mbps <= 0 or subida_mbps <= 0:
+        raise ValueError("el ancho de banda debe ser mayor que 0 (use math.inf si no limita)")
+    tabla = [
+        ronda_especulativa(
+            g, alfa=alfa, rtt_ms=rtt_ms, bajada_mbps=bajada_mbps, subida_mbps=subida_mbps,
+            ms_verificar=ms_verificar, d_modelo=d_modelo, bytes_por_valor=bytes_por_valor,
+            bytes_grafo=bytes_grafo, costo_borrador=costo_borrador,
+        )
+        for g in range(gamma_max + 1)
+    ]
+    mejor = max(tabla, key=lambda f: (f["tok_s"], -f["gamma"]))
+    return Ventana(mejor["gamma"], mejor["tok_s"], tabla[0]["tok_s"], tabla)
+
+
 # Modelos. Tamaños de GGUF medidos o de fabric/PRUEBA-10.md; capas y ancho de las fichas de los modelos.
 QWEN35_9B_Q8 = Modelo("Qwen3.5-9B Q8_0", 9.53, capas=32, d_modelo=4096)  # 9,53 GB medido
 QWEN38_27B_Q4 = Modelo("Qwen3.8-27B UD-Q4_K_M", 16.5, capas=64, d_modelo=5120)  # capas y ancho: SUPUESTO

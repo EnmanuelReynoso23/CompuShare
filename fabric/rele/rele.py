@@ -6,6 +6,15 @@ medias se da por perdida (el cliente la reintenta).
 
 Protocolo: mensajes JSON por WebSocket, uno por frame, con el campo `t`.
 
+  trabajador -> relé (tubo, conexión de control; la sonda de banda)
+    banda_preparada {id}                       contesta banda_bajada (bytes binarios después)
+    banda_ok        {id, bytes}                 recibió todos los bytes de la bajada
+    banda_fin       {id}                        mandó los bytes de la subida (binarios antes)
+
+  relé -> trabajador (tubo)
+    banda_bajada    {id, bytes}                 prueba de bajada: bytes binarios tras banda_preparada
+    banda       {id, bytes}                     prueba de subida: contestar con bytes binarios y banda_fin
+
   cliente/nodo -> relé
     hola       {clave, enjambre, rol: "nodo"|"cliente", id?, nombre?, capacidades?, info?}
     latido     {carga?}
@@ -72,6 +81,9 @@ ENJAMBRE_VALIDO = re.compile(r"^[a-z0-9-]{1,40}$")
 ID_VALIDO = re.compile(r"^[A-Za-z0-9_-]{4,48}$")
 TUBO_PUERTO_BASE = int(os.environ.get("TUBO_PUERTO_BASE", "50100"))
 TUBO_TROZO = 256 * 1024
+# Sonda de ancho de banda por la conexión de control de cada tubo (0 = apagada). Ver `sonda_banda`.
+SONDA_BYTES = int(os.environ.get("FABRIC_SONDA_BYTES", str(1024 * 1024)))
+SONDA_ESPERA_S = 10.0  # un tubo que no contesta en este plazo se da por viejo y no recibe nada más
 
 log = logging.getLogger("rele")
 
@@ -121,6 +133,8 @@ class Oferta:
     abiertos: int = 0
     esperando: dict[str, asyncio.Future] = field(default_factory=dict)
     info: dict = field(default_factory=dict)  # lo que el trabajador dice prestar (p. ej. vram_gb)
+    sonda_esperas: dict[tuple[str, str], asyncio.Future] = field(default_factory=dict)
+    sonda_recibidos: int = 0  # bytes binarios que llegaron del tubo durante una subida de prueba
 
 
 @dataclass
@@ -460,19 +474,104 @@ class Rele:
         )
         self.ofertas[nombre] = oferta
         log.info("tubo %s ofrecido en 127.0.0.1:%s", nombre, puerto)
+        sonda: asyncio.Task | None = None
         try:
             await ws.send(json.dumps({"t": "listo", "puerto": puerto}))
-            async for _ in ws:  # solo latidos; la conexión de control vive mientras se ofrezca
-                pass
+            if SONDA_BYTES > 0:
+                sonda = asyncio.create_task(self.sonda_banda(oferta))
+            # latidos, respuestas de la sonda de banda y, durante una subida de prueba, sus bytes
+            async for mensaje in ws:
+                if isinstance(mensaje, bytes):
+                    oferta.sonda_recibidos += len(mensaje)
+                else:
+                    self._respuesta_sonda(oferta, mensaje)
         except ConnectionClosed:
             pass
         finally:
+            if sonda is not None:
+                sonda.cancel()
             oferta.servidor.close()
-            for futuro in oferta.esperando.values():
+            for futuro in list(oferta.esperando.values()) + list(oferta.sonda_esperas.values()):
                 futuro.cancel()
             if self.ofertas.get(nombre) is oferta:
                 del self.ofertas[nombre]
             log.info("tubo %s retirado", nombre)
+
+    # ── sonda de ancho de banda ─────────────────────────────────────────────
+    # Al ofrecerse un tubo, el relé mide por su conexión de control (sin abrir nada más):
+    #   1. ida y vuelta: 3 pings (los responde solo cualquier cliente websocket, también uno viejo);
+    #   2. bajada (maestro->trabajador): manda {"t":"banda_bajada","id","bytes"}; un tubo nuevo contesta
+    #      {"t":"banda_preparada"} y solo entonces el relé manda los bytes binarios en trozos. El tubo
+    #      responde {"t":"banda_ok"} al recibirlos todos;
+    #   3. subida (trabajador->maestro): manda {"t":"banda","id","bytes"}; el tubo envía esos bytes en
+    #      binario y cierra con {"t":"banda_fin"}.
+    # Tiempo de transferencia = tiempo medido - ida y vuelta (en ambos sentidos el relé espera un viaje
+    # de ida y uno de vuelta además de los bytes). Un tubo viejo no contesta el paso 2: el relé se rinde
+    # a los SONDA_ESPERA_S segundos sin mandarle ningún binario (uno viejo muere al leer un binario como JSON).
+
+    def _esperar(self, oferta: Oferta, tipo: str, ident: str) -> asyncio.Future:
+        futuro: asyncio.Future = asyncio.get_running_loop().create_future()
+        oferta.sonda_esperas[(tipo, ident)] = futuro
+        return futuro
+
+    def _respuesta_sonda(self, oferta: Oferta, crudo: str) -> None:
+        try:
+            m = json.loads(crudo)
+        except ValueError:
+            return
+        if not isinstance(m, dict) or m.get("t") not in ("banda_preparada", "banda_ok", "banda_fin"):
+            return
+        futuro = oferta.sonda_esperas.pop((m["t"], str(m.get("id", ""))), None)
+        if futuro is not None and not futuro.done():
+            futuro.set_result(m)
+
+    async def sonda_banda(self, oferta: Oferta) -> None:
+        """Llena oferta.info con bajada_mbps, subida_mbps y sonda ('ok', 'sin_respuesta', 'inconclusa')."""
+        n = SONDA_BYTES
+        ws = oferta.control
+        try:
+            rtt = await self._medir_rtt(ws, oferta)
+            ident = secrets.token_hex(6)
+            # bajada
+            preparada = self._esperar(oferta, "banda_preparada", ident)
+            ok = self._esperar(oferta, "banda_ok", ident)
+            await ws.send(json.dumps({"t": "banda_bajada", "id": ident, "bytes": n}))
+            await asyncio.wait_for(preparada, SONDA_ESPERA_S)
+            bloque = bytes(TUBO_TROZO)
+            inicio = time.perf_counter()
+            for enviados in range(0, n, TUBO_TROZO):
+                await ws.send(bloque[: min(TUBO_TROZO, n - enviados)])
+            await asyncio.wait_for(ok, SONDA_ESPERA_S)
+            bajada_s = time.perf_counter() - inicio - rtt
+            # subida
+            ident = secrets.token_hex(6)
+            fin = self._esperar(oferta, "banda_fin", ident)
+            oferta.sonda_recibidos = 0
+            inicio = time.perf_counter()
+            await ws.send(json.dumps({"t": "banda", "id": ident, "bytes": n}))
+            await asyncio.wait_for(fin, SONDA_ESPERA_S)
+            subida_s = time.perf_counter() - inicio - rtt
+            if oferta.sonda_recibidos != n or min(bajada_s, subida_s) < 0.002:
+                oferta.info["sonda"] = "inconclusa"  # demasiado rápido para separar la ida y vuelta
+                return
+            oferta.info["bajada_mbps"] = round(n * 8 / bajada_s / 1e6, 2)
+            oferta.info["subida_mbps"] = round(n * 8 / subida_s / 1e6, 2)
+            oferta.info["sonda"] = "ok"
+            log.info("tubo %s: bajada %.1f Mb/s, subida %.1f Mb/s (ida y vuelta %.1f ms)",
+                     oferta.nombre, oferta.info["bajada_mbps"], oferta.info["subida_mbps"], rtt * 1000)
+        except (asyncio.TimeoutError, ConnectionClosed):
+            oferta.info["sonda"] = "sin_respuesta"
+            log.info("tubo %s no contesta la sonda de banda (¿versión vieja?)", oferta.nombre)
+        finally:
+            oferta.sonda_esperas.clear()
+
+    async def _medir_rtt(self, ws: ServerConnection, oferta: Oferta) -> float:
+        """Mínimo de 3 pings: segundos de ida y vuelta por la conexión de control."""
+        mejor = float("inf")
+        for _ in range(3):
+            pong = await ws.ping()
+            mejor = min(mejor, await asyncio.wait_for(pong, SONDA_ESPERA_S))
+        return mejor
 
     async def abrir_tubo(self, oferta: Oferta, lector: asyncio.StreamReader, escritor: asyncio.StreamWriter) -> None:
         ident = secrets.token_hex(8)

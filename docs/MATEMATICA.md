@@ -144,7 +144,39 @@ Revisando al azar el 2 % de las pasadas, un nodo que corrompe el 10 % de sus res
    sus respuestas en unas 2.300 pasadas (menos de 5 minutos a 10 palabras/s). Con amigos de confianza
    alcanza; para una red pública hay que subir f.
 
-## 5. Lo que falta medir para dejar de suponer
+## 5. Longitud del borrador γ* según el enlace (PREDICCIÓN)
+
+Con decodificación especulativa cada ronda valida γ borradores en un lote. Lo que cruza el enlace crece con γ
+y lo que se gana crece con γ hasta que el enlace se llena. Código: `fabric/calculo.py: ventana_optima`.
+
+    E(α, γ) = (1 - α^(γ+1)) / (1 - α)                         palabras por ronda
+    T(γ)    = RTT + bytes(γ)/ancho + verificar(γ+1)            (× (1 + c·γ) si el borrador cuesta)
+    bytes(γ), por sentido = (γ+1)·d·4 + grafo/2                  los dos sentidos van en serie
+    γ* = argmax_γ  E(α, γ) / T(γ)                               tok/s = 1000·E/T
+
+Lo que es SUPUESTO, no medido: α (el maestro usa 0,75; se midió 89,7 % con ngram-mod,draft-mtp en Kaggle);
+verificar(γ+1), que se toma igual al cálculo de una pasada; el costo por palabra adivinada c, que es 0 con
+ngram-mod y 0,28 con MTP (sección 2). El grafo reenviado es una ESTIMACIÓN: 296 B por tensor x 33 tensores por
+capa, unos 312 KB para 9B (medido: 315 KB); con el grafo reutilizado (códec) vale casi 0. El ancho de banda
+es el del trabajador más lento (en el maestro, el mínimo entre los trabajadores usados).
+
+Tabla de la predicción para Qwen3.5-9B Q8_0 (maestro + 1 trabajador, α 0,75, grafo sin códec):
+
+| Perfil | ms cálculo | ms por ronda con γ=0 | γ* ngram-mod | tok/s ngram (sin especulativa) | γ* MTP | tok/s MTP |
+|---|---|---|---|---|---|---|
+| Kaggle (2 x T4, 37 ms, 500 Mb/s) | 42,5 | 85 | 13 | 42,8 (11,8) | 2 | 17,2 |
+| Casa (40 ms, 15 Mb/s) | 44,7 | 269 | 6 | 9,3 (3,7) | 2 | 4,9 |
+| Casa lejana (150 ms, 5 Mb/s) | 44,7 | 747 | 6 | 3,3 (1,3) | 2 | 1,7 |
+
+Lectura: en Kaggle el modelo predice 11,8 tok/s sin especulativa, pero la corrida medida del 31-oct dio 6,8 con
+otro enlace y sin el grafo reutilizado; la tabla predice perfiles, no recalibra. Con el grafo reutilizado y
+15 Mb/s, la casa pasa a γ* 4 y 17,7 tok/s (base 9,8). El borrador MTP con c = 0,28 deja γ* en 1-2 en cualquier
+enlace lento: hace falta medir c por la red antes de creerlo. Con α 0,90 (cerca del 89,7 % medido) el γ* de
+ngram-mod sube a 12-16. `compushare calcular --rtt-ms 40 --subida-mbps 15 --modelo 27b` imprime γ* y su tabla
+para 27B y 35B con los amigos supuestos de `fabric/escenarios.py`; la tabla de 9B de arriba sale de
+`fabric/calculo.py` con los equipos que se indican.
+
+## 6. Lo que falta medir para dejar de suponer
 
 - Bytes por palabra por comando RPC, con grafo reutilizado y sin él (A4).
 - Ida y vuelta y subida reales entre las casas de los amigos (A9).

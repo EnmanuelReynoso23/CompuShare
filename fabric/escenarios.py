@@ -15,6 +15,7 @@ from fabric.calculo import (
     T4_GBS,
     Equipo,
     Modelo,
+    bytes_grafo_sin_codec,
     calibrar_mtp,
     con_especulativa,
     disponibilidad_cadena,
@@ -24,6 +25,7 @@ from fabric.calculo import (
     palabras_por_pasada,
     prob_detectar_tramposo,
     tiempo_por_palabra,
+    ventana_optima,
 )
 
 # SUPUESTOS: memoria usable para el modelo y ancho de banda de memoria de catálogo.
@@ -48,6 +50,28 @@ def fila(r, extra=""):
     usados = [f"{n.split(' (')[0]}:{c}" for n, c in zip(r.equipos, r.capas)]
     return (f"| {', '.join(usados)} | {r.ms_calculo:.0f} | {r.ms_red:.0f} | {r.ms_por_pasada:.0f} | "
             f"{r.palabras_s_por_flujo:.1f} | {r.palabras_s_total:.1f} |{extra}")
+
+
+def ventana_para(m, maestro, cands, acierto=0.75, costo_borrador=0.0):
+    """Gamma* (longitud del borrador) para el reparto que elige elegir_optimo con estos amigos.
+
+    El RTT de la cadena y el ancho de banda del enlace más lento salen de los equipos usados.
+    La subida se usa en los dos sentidos porque el CLI solo tiene --subida-mbps (SUPUESTO).
+    """
+    r = elegir_optimo(m, maestro, cands, None, 1)
+    usados = [c for c in cands if c.nombre in r.equipos]
+    subida = min((c.subida_mbps for c in usados), default=math.inf)
+    v = ventana_optima(
+        alfa=acierto,
+        rtt_ms=sum(c.rtt_ms for c in usados),
+        bajada_mbps=subida,
+        subida_mbps=subida,
+        ms_verificar=r.ms_calculo,
+        d_modelo=m.d_modelo,
+        bytes_grafo=bytes_grafo_sin_codec(m.capas),
+        costo_borrador=costo_borrador,
+    )
+    return r, v
 
 
 def main() -> None:

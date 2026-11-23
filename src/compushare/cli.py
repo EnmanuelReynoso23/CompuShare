@@ -30,7 +30,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from compushare.nodo.maestro import NodoMaestro
+from compushare.nodo.maestro import COSTO_BORRADOR_MTP, NodoMaestro
 from compushare.nodo.trabajador import NodoTrabajador, buscar_binario
 from compushare import transcribir as transcripcion
 from fabric import calculo, escenarios
@@ -351,10 +351,18 @@ def servir(
     espera_carga: float = typer.Option(900.0, help="Segundos maximos para que llama-server cargue el modelo"),
     reinicios: int = typer.Option(3, help="Veces que se relanza llama-server si se cae (por ejemplo, si se cae un trabajador)"),
     duracion: float = typer.Option(0.0, help="Segundos tras los cuales salir (0 para infinito)"),
+    ventana: str = typer.Option("auto", help="Longitud del borrador de la especulativa: auto (segun el enlace medido), un numero, o 0 para no tocarla"),
+    acierto: float = typer.Option(0.75, help="Acierto supuesto de los borradores (0 a 1) para calcular la ventana automatica"),
 ):
     """Inicia el nodo maestro: reparte el modelo entre los trabajadores y sirve llama-server en 127.0.0.1."""
     if not modelo.is_file():
         err_console.print(f"Error: El archivo de modelo no existe: {modelo}")
+        raise typer.Exit(code=1)
+    if ventana != "auto" and not ventana.isdigit():
+        err_console.print("Error: --ventana debe ser auto o un numero entero (0 = no tocar)")
+        raise typer.Exit(code=1)
+    if not 0 <= acierto <= 1:
+        err_console.print("Error: --acierto debe estar entre 0 y 1")
         raise typer.Exit(code=1)
 
     clave_res = resolver_clave(clave, clave_archivo)
@@ -383,6 +391,8 @@ def servir(
         especulativa=especulativa,
         espera_carga=espera_carga,
         max_reinicios=reinicios,
+        ventana=ventana,
+        acierto=acierto,
     )
 
     try:
@@ -394,17 +404,41 @@ def servir(
     console.print("Servidor maestro finalizado.")
 
 
+def _mostrar_gamma(modelos: list, maestro: Any, cands: list, acierto: float) -> None:
+    """Longitud del borrador (gamma*) y su tabla. PREDICCION: ver fabric/calculo.py ventana_optima."""
+    console.print(f"[bold]Longitud del borrador (gamma*), prediccion con acierto supuesto {acierto:.2f}[/bold]\n")
+    for m in modelos:
+        for tipo, costo in (("ngram-mod", 0.0), ("draft-mtp", COSTO_BORRADOR_MTP)):
+            try:
+                _, v = escenarios.ventana_para(m, maestro, cands, acierto, costo)
+            except ValueError:
+                console.print(f"{m.nombre}, {tipo}: no cabe\n")
+                break
+            console.print(f"## {m.nombre}, {tipo}: gamma* = {v.gamma} -> {v.tok_s:.1f} tok/s predichos "
+                          f"(sin especulativa {v.tok_s_sin_especulativa:.1f})\n")
+            if tipo == "ngram-mod":
+                console.print("| gamma | tokens esperados por ronda | KB por ronda | ms por ronda | tok/s |")
+                console.print("|---|---|---|---|---|")
+                for f in v.tabla:
+                    console.print(f"| {f['gamma']} | {f['esperados']:.2f} | {f['bytes_ronda'] / 1e3:.0f} | "
+                                  f"{f['ms_ronda']:.0f} | {f['tok_s']:.1f} |")
+                console.print()
+
+
 @app.command()
 def calcular(
     rtt_ms: float = typer.Option(40.0, help="Ida y vuelta promedio en milisegundos"),
-    subida_mbps: float = typer.Option(10.0, help="Velocidad de subida en Mb/s"),
-    modelo: Optional[str] = typer.Option(None, help="Filtrar por modelo especifico (27b, 35b, 9b)"),
+    subida_mbps: float = typer.Option(10.0, help="Velocidad de subida en Mb/s (tambien se usa como bajada)"),
+    modelo: Optional[str] = typer.Option(None, help="Filtrar por modelo especifico (27b, 35b)"),
+    acierto: float = typer.Option(0.75, help="Acierto supuesto de los borradores, entre 0 y 1 (para gamma*)"),
 ):
-    """Imprime los escenarios matematicos de fabric/escenarios.py para los parametros dados."""
+    """Imprime los escenarios matematicos de fabric/escenarios.py y la longitud de borrador gamma* para los parametros dados."""
     console.print(f"[bold]Calculo de Escenarios Distribuidos (RTT: {rtt_ms} ms, Subida: {subida_mbps} Mb/s)[/bold]\n")
 
     if rtt_ms == 40.0 and subida_mbps == 10.0 and modelo is None:
         escenarios.main()
+        maestro, cands = escenarios.amigos()
+        _mostrar_gamma([escenarios.QWEN38_27B, escenarios.MOE_35B_A3B], maestro, cands, acierto)
         return
 
     maestro, cands = escenarios.amigos(rtt=rtt_ms, subida=subida_mbps)
@@ -434,6 +468,7 @@ def calcular(
                 except ValueError:
                     console.print(f"| no cabe | | | | | | {etiqueta}, {flujos} flujos |")
         console.print()
+    _mostrar_gamma(modelos, maestro, cands, acierto)
 
 
 @app.command()

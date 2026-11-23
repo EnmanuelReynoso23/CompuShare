@@ -18,8 +18,9 @@ comando 0-17 son los mismos en b12024.
 - llama.cpp solo evita reenviarlo con `GRAPH_RECOMPUTE` (16) si el grafo es **el mismo que el último**
   (`last_graph_uid`, un solo grafo recordado por dispositivo). Con decodificación especulativa se alternan
   grafos de distinto tamaño de lote (borrador, verificación de γ+1 tokens, MTP), así que casi cada paso
-  reenvía el grafo completo. Hipótesis principal para los ~633 KB por token medidos en Kaggle: la mayor
-  parte es grafo, no activaciones (la activación de Qwen3.5-9B son 4.096 x 4 B = 16 KB por token).
+  reenvía el grafo completo. Además `ngram-mod` arma borradores de 48 a 64 tokens por defecto, así que
+  cada verificación lleva hasta ~1 MB de activaciones por sentido con Qwen3.5-9B (4.096 x 4 B x 65).
+  Los ~633 KB por token medidos en Kaggle son una mezcla de las dos cosas; la proporción se mide.
 - Los grafos de dos pasos con distinto lote tienen la misma forma y solo cambian `ne`, `nb`, `data` y
   algunos `op_params`: un XOR contra el anterior es casi todo ceros y se comprime a muy poco.
 
