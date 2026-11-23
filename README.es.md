@@ -31,7 +31,15 @@ Licencia MIT.
   - la tabla de salida se queda en el maestro (lo que viaja por palabra baja de 993 KB a 4,1 KB), con un
     patrón anclado para que no arrastre la proyección de salida de cada capa de atención;
   - sin puntos de control ni caché de prompts (cada uno costaba una ida y vuelta por la red);
-  - decodificación especulativa opcional (`--especulativa ngram-mod` o `draft-mtp`).
+  - decodificación especulativa opcional (`--especulativa ngram-mod` o `draft-mtp`), con la longitud del
+    borrador elegida según la ida y vuelta y el ancho de banda medidos de cada tubo (`--ventana auto`; es
+    una predicción de `fabric/calculo.py: ventana_optima`).
+- **Códec `rpc1` del tubo** (`fabric/rpc_codec.py`, `go/pkg/rpccodec`; ver `docs/CODEC-RPC.md`): el relé lee el
+  protocolo de `ggml-rpc` y no reenvía grafos que el trabajador ya tiene (referencia o diferencia comprimida);
+  el tubo reconstruye el flujo exacto. Sin pérdida y negociado: con nodos viejos todo viaja crudo como antes.
+  Se apaga con `FABRIC_CODEC=0`; `FABRIC_CODEC_Q8=1` cuantiza además las activaciones (con pérdida, experimental).
+- **Nodo completo** (`compushare unirse --completo --modelo X.gguf`): si un trabajador tiene el modelo entero,
+  corre su propio `llama-server` y `servir --modo auto` lo prefiere; por la red solo viaja texto.
 - **Cliente** (`compushare probar`, `compushare transcribir`): habla con `llama-server` por su protocolo
   propio (`/apply-template` y `/completion`).
 - **Caídas**: si a un trabajador se le cae `ggml-rpc-server`, lo relanza en el mismo puerto; si se cae
@@ -73,6 +81,17 @@ compushare probar --prompt "En una frase: qué es una computadora compartida?"
 compushare transcribir libro.txt --cuantos 3 --salida transcripcion/
 ```
 
+Nodo completo y motor Go (opcional):
+
+```bash
+# Un trabajador con el modelo entero (opcional: --borrador chico.gguf --especulativa draft-simple)
+compushare unirse --rele ws://IP-DEL-MAESTRO:59095 --nombre pc-grande --completo --modelo Qwen3.5-9B-Q8_0.gguf
+# El maestro lo prefiere si tiene el mismo modelo (--modo auto|completo|capas)
+compushare servir --modelo Qwen3.5-9B-Q8_0.gguf --modo auto
+# Relé y tubo en Go (cd go && go build -o bin/ ./cmd/...)
+compushare unirse --rele ws://IP-DEL-MAESTRO:59095 --nombre laptop-1 --motor go
+```
+
 Otros comandos: `compushare info` (equipos de esta máquina) y `compushare calcular` (predicción con las
 fórmulas de `fabric/calculo.py`; es cálculo, no medición).
 
@@ -101,7 +120,11 @@ HELLO, no la ida y vuelta por una conexión abierta. Desde el 4-nov se miden las
 (`fabric/reparto.py: medir_enlace`).
 
 Pendiente: con especulativa pasan unos 633 KB por token generado (11,0 MB/s en Kaggle), demasiado para muchas
-conexiones de casa; la recuperación ante caídas está probada en local pero no hubo cortes en la corrida de Kaggle.
+conexiones de casa. Desde el 23-nov hay tres arreglos **sin medir todavía con llama.cpp**: el códec `rpc1`
+(grafos repetidos), la longitud del borrador según el enlace (`ngram-mod` arma borradores de 48-64 tokens por
+defecto) y el modo nodo completo. En flujos sintéticos el códec baja los grafos repetidos un 99,8 %; cuánto baja
+de los 633 KB se mide con `python -m fabric.perfiles.desglose_rpc` (ver `docs/PLAN-V2.md`). La recuperación ante
+caídas está probada en local pero no hubo cortes en la corrida de Kaggle.
 
 ---
 
@@ -111,12 +134,14 @@ conexiones de casa; la recuperación ante caídas está probada en local pero no
 fabric/                 La red
   rele/                 Relé WebSocket con tubos TCP
   tubo.py               Lado trabajador del tubo
+  rpc_codec.py          Códec rpc1: grafos repetidos sin reenviar (docs/CODEC-RPC.md)
   reparto.py            Elegir trabajadores; tabla de salida en el maestro
   rpc_cache.py          Caché del trabajador armada desde su propio GGUF (los pesos no cruzan la red)
   descubrir.py          Encontrar el relé del día sin escribir URLs
   nodo/                 Nodo con modelo entero (generar, embeber, reordenar)
   calculo.py            Fórmulas que predicen tok/s y memoria
   simulador/            Proxy TCP con latencia, variación y ancho de banda; N trabajadores en una PC
+  perfiles/             Medición: desglose_rpc.py cuenta bytes por comando ggml-rpc
   kaggle/               lanzar.py sube los cuadernos; nodo_kaggle.py es lo que corre dentro
   directo/              Prototipo de conexión directa P2P (WebRTC)
   pruebas/              Pruebas (pytest)
@@ -124,11 +149,12 @@ src/compushare/         Paquete y CLI `compushare`
   cli.py                info, unirse, servir, calcular, probar, transcribir
   nodo/                 Maestro y trabajador
   transcribir.py        Copiar un texto por la red y verificarlo letra por letra
-go/                     Relé, tubo y conexión directa en Go (todavía no los usa la CLI)
+go/                     Relé, tubo, códec y conexión directa en Go (`--motor go`)
 docs/                   Matemática de la red, estado del arte, estado y pendientes
 ```
 
 Pruebas: `python -m pytest fabric/pruebas`.
 
 Documentación: [PLAN.md](PLAN.md), [docs/MATEMATICA.md](docs/MATEMATICA.md),
-[docs/ESTADO-Y-PENDIENTES.md](docs/ESTADO-Y-PENDIENTES.md).
+[docs/ESTADO-Y-PENDIENTES.md](docs/ESTADO-Y-PENDIENTES.md), [docs/PLAN-V2.md](docs/PLAN-V2.md),
+[docs/CODEC-RPC.md](docs/CODEC-RPC.md).

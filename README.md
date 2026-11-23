@@ -32,7 +32,15 @@ MIT License.
   - the output table stays on the master (traffic per token drops from 993 KB to 4.1 KB), with an
     anchored pattern so it does not drag along the output projection of every attention layer;
   - no checkpoints or prompt cache (each one cost a network round trip);
-  - optional speculative decoding (`--especulativa ngram-mod` or `draft-mtp`).
+  - optional speculative decoding (`--especulativa ngram-mod` or `draft-mtp`), with the draft length chosen
+    from each tunnel's measured round trip and bandwidth (`--ventana auto`; a prediction from
+    `fabric/calculo.py: ventana_optima`).
+- **`rpc1` tunnel codec** (`fabric/rpc_codec.py`, `go/pkg/rpccodec`; see `docs/CODEC-RPC.md`): the relay reads the
+  `ggml-rpc` protocol and does not resend graphs the worker already has (a reference or a compressed delta);
+  the tunnel rebuilds the exact stream. Lossless and negotiated: with older nodes everything travels raw as before.
+  Turn it off with `FABRIC_CODEC=0`; `FABRIC_CODEC_Q8=1` also quantizes activations (lossy, experimental).
+- **Full node** (`compushare unirse --completo --modelo X.gguf`): if a worker holds the whole model, it runs its
+  own `llama-server` and `servir --modo auto` prefers it; only text crosses the network.
 - **Client** (`compushare probar`, `compushare transcribir`): talks to `llama-server` through its own
   protocol (`/apply-template` and `/completion`).
 - **Failures**: if a worker's `ggml-rpc-server` crashes, the worker restarts it on the same port. If
@@ -75,6 +83,17 @@ compushare probar --prompt "In one sentence: what is a shared computer?"
 compushare transcribir libro.txt --cuantos 3 --salida transcripcion/
 ```
 
+Full node and Go engine (optional):
+
+```bash
+# A worker with the whole model (optional: --borrador small.gguf --especulativa draft-simple)
+compushare unirse --rele ws://MASTER-IP:59095 --nombre big-pc --completo --modelo Qwen3.5-9B-Q8_0.gguf
+# The master prefers it when it has the same model (--modo auto|completo|capas)
+compushare servir --modelo Qwen3.5-9B-Q8_0.gguf --modo auto
+# Relay and tunnel in Go (cd go && go build -o bin/ ./cmd/...)
+compushare unirse --rele ws://MASTER-IP:59095 --nombre laptop-1 --motor go
+```
+
 Other commands: `compushare info` (hardware on this machine) and `compushare calcular` (a prediction using
 the formulas in `fabric/calculo.py`; it is a calculation, not a measurement).
 
@@ -103,7 +122,11 @@ HELLO handshake, not the round trip over an open connection. Since Nov 4 the two
 (`fabric/reparto.py: medir_enlace`).
 
 Still open: with speculation about 633 KB travel per generated token (11.0 MB/s on Kaggle), too much for many
-home connections. Failure recovery is tested locally, but there were no outages during the Kaggle run.
+home connections. Since Nov 23 there are three fixes **not yet measured with llama.cpp**: the `rpc1` codec
+(repeated graphs), the draft length chosen from the link (`ngram-mod` drafts 48-64 tokens by default) and the
+full-node mode. On synthetic streams the codec cuts repeated graphs by 99.8 %; how much of the 633 KB it removes
+is measured with `python -m fabric.perfiles.desglose_rpc` (see `docs/PLAN-V2.md`). Failure recovery is tested
+locally, but there were no outages during the Kaggle run.
 
 ---
 
@@ -113,12 +136,14 @@ home connections. Failure recovery is tested locally, but there were no outages 
 fabric/                 The network
   rele/                 WebSocket relay with TCP tunnels
   tubo.py               Worker side of the tunnel
+  rpc_codec.py          rpc1 codec: repeated graphs are not resent (docs/CODEC-RPC.md)
   reparto.py            Choosing workers; output table on the master
   rpc_cache.py          Worker cache built from its own GGUF (weights do not cross the network)
   descubrir.py          Finding the day's relay without typing URLs
   nodo/                 Node with a whole model (generate, embed, rerank)
   calculo.py            Formulas that predict tok/s and memory
   simulador/            TCP proxy with latency, jitter and bandwidth; N workers on one PC
+  perfiles/             Measurement: desglose_rpc.py counts bytes per ggml-rpc command
   kaggle/               lanzar.py uploads the notebooks; nodo_kaggle.py is what runs inside
   directo/              Prototype of a direct P2P connection (WebRTC)
   pruebas/              Tests (pytest)
@@ -126,7 +151,7 @@ src/compushare/         Package and `compushare` CLI
   cli.py                info, unirse, servir, calcular, probar, transcribir
   nodo/                 Master and worker
   transcribir.py        Copying a text over the network and verifying it character by character
-go/                     Relay, tunnel and direct connection in Go (not used by the CLI yet)
+go/                     Relay, tunnel, codec and direct connection in Go (`--motor go`)
 docs/                   Network math, state of the art, status and open items
 ```
 
