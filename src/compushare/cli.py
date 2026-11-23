@@ -301,27 +301,63 @@ def unirse(
     threads: int = typer.Option(4, help="Hilos de CPU para el servidor RPC (maximo 6)"),
     cache: bool = typer.Option(False, help="Habilitar cache local de archivos en ggml-rpc-server"),
     duracion: float = typer.Option(0.0, help="Segundos tras los cuales salir (0 para infinito)"),
+    modelo: Optional[Path] = typer.Option(None, help="Archivo GGUF del modelo entero (solo con --completo)"),
+    completo: bool = typer.Option(False, help="Tener el modelo entero: corre llama-server aqui y el tubo solo lleva HTTP"),
+    borrador: Optional[Path] = typer.Option(None, help="Modelo GGUF pequeno para decodificacion especulativa (-md, solo con --completo)"),
+    especulativa: str = typer.Option("", help="Tipo de decodificacion especulativa de llama.cpp (--spec-type, solo con --completo)"),
+    puerto_api: int = typer.Option(59080, help="Puerto de llama-server en 127.0.0.1 (solo con --completo)"),
+    ctx_size: int = typer.Option(4096, help="Contexto por flujo (solo con --completo)"),
+    paralelo: int = typer.Option(1, help="Flujos a la vez de llama-server (solo con --completo)"),
+    motor: str = typer.Option("python", help="Tubo: python (fabric/tubo.py) o go (binario compushare-tubo)"),
+    go_bin: Optional[str] = typer.Option(None, help="Carpeta con los binarios de Go (compushare-tubo, compushare-rele)"),
 ):
     """Conecta esta maquina a la red CompuShare como trabajador de computo."""
     clave_res = resolver_clave(clave, clave_archivo)
     if not clave_res:
         err_console.print("Error: No se especifico la clave. Usa --clave, --clave-archivo o define FABRIC_CLAVE.")
         raise typer.Exit(code=1)
+    if motor not in ("python", "go"):
+        err_console.print(f"Error: --motor debe ser python o go (no {motor!r})")
+        raise typer.Exit(code=1)
+
+    if completo and (modelo is None or not modelo.is_file()):
+        err_console.print(f"Error: --completo necesita --modelo con el archivo GGUF existente (no existe: {modelo})")
+        raise typer.Exit(code=1)
+    if not completo and (modelo is not None or borrador is not None or especulativa):
+        err_console.print("Error: --modelo, --borrador y --especulativa solo valen con --completo")
+        raise typer.Exit(code=1)
 
     console.print(f"[bold green]Uniendo equipo a la red CompuShare[/bold green]")
     console.print(f"Rele: {rele}")
-    console.print(f"Servidor RPC local: 127.0.0.1:{puerto_rpc} (hilos: {min(6, max(1, threads))})")
+    if completo:
+        console.print(f"Modo completo: llama-server con {modelo.name} en 127.0.0.1:{puerto_api}"
+                      + (f", borrador {borrador.name}" if borrador else ""))
+    else:
+        console.print(f"Servidor RPC local: 127.0.0.1:{puerto_rpc} (hilos: {min(6, max(1, threads))})")
 
-    nodo = NodoTrabajador(
-        rele_url=rele,
-        clave=clave_res,
-        nombre=nombre,
-        puerto_rpc=puerto_rpc,
-        vram_gb=vram_gb,
-        llama_bin=llama_bin,
-        threads=threads,
-        cache=cache,
-    )
+    try:
+        nodo = NodoTrabajador(
+            rele_url=rele,
+            clave=clave_res,
+            nombre=nombre,
+            puerto_rpc=puerto_rpc,
+            vram_gb=vram_gb,
+            llama_bin=llama_bin,
+            threads=threads,
+            cache=cache,
+            modelo=modelo if completo else None,
+            completo=completo,
+            borrador=borrador,
+            especulativa=especulativa,
+            puerto_api=puerto_api,
+            ctx_size=ctx_size,
+            paralelo=paralelo,
+            motor=motor,
+            go_bin=go_bin,
+        )
+    except FileNotFoundError as e:
+        err_console.print(f"Error: {e}")
+        raise typer.Exit(code=1)
 
     try:
         asyncio.run(nodo.conectar(duracion=duracion))
@@ -353,9 +389,19 @@ def servir(
     duracion: float = typer.Option(0.0, help="Segundos tras los cuales salir (0 para infinito)"),
     ventana: str = typer.Option("auto", help="Longitud del borrador de la especulativa: auto (segun el enlace medido), un numero, o 0 para no tocarla"),
     acierto: float = typer.Option(0.75, help="Acierto supuesto de los borradores (0 a 1) para calcular la ventana automatica"),
+    modo: str = typer.Option("auto", help="auto: nodo completo con el mismo modelo si hay uno, si no capas; completo: exige un nodo completo; capas: reparto por RPC"),
+    modelo_bytes: Optional[int] = typer.Option(None, help="Tamano en bytes del modelo (solo --modo completo, si no esta el archivo)"),
+    motor_rele: str = typer.Option("python", help="Relé local: python (en este proceso) o go (binario compushare-rele)"),
+    go_bin: Optional[str] = typer.Option(None, help="Carpeta con los binarios de Go (compushare-tubo, compushare-rele)"),
 ):
     """Inicia el nodo maestro: reparte el modelo entre los trabajadores y sirve llama-server en 127.0.0.1."""
-    if not modelo.is_file():
+    if modo not in ("auto", "completo", "capas"):
+        err_console.print(f"Error: --modo debe ser auto, completo o capas (no {modo!r})")
+        raise typer.Exit(code=1)
+    if motor_rele not in ("python", "go"):
+        err_console.print(f"Error: --motor-rele debe ser python o go (no {motor_rele!r})")
+        raise typer.Exit(code=1)
+    if modo != "completo" and not modelo.is_file():
         err_console.print(f"Error: El archivo de modelo no existe: {modelo}")
         raise typer.Exit(code=1)
     if ventana != "auto" and not ventana.isdigit():
@@ -372,28 +418,37 @@ def servir(
 
     console.print("[bold green]Iniciando Nodo Maestro CompuShare[/bold green]")
     console.print(f"Modelo: {modelo}")
+    console.print(f"Modo: {modo}")
     console.print(f"llama-server: http://127.0.0.1:{puerto}")
     console.print(f"Rele: {rele}")
 
-    maestro = NodoMaestro(
-        modelo=modelo,
-        rele_url=rele,
-        clave=clave_res,
-        puerto_api=puerto,
-        puerto_rele=puerto_rele,
-        iniciar_rele_local=iniciar_rele,
-        llama_bin=llama_bin,
-        espera_trabajadores=espera_trabajadores,
-        min_trabajadores=min_trabajadores,
-        threads=threads,
-        ctx_size=ctx_size,
-        paralelo=paralelo,
-        especulativa=especulativa,
-        espera_carga=espera_carga,
-        max_reinicios=reinicios,
-        ventana=ventana,
-        acierto=acierto,
-    )
+    try:
+        maestro = NodoMaestro(
+            modelo=modelo,
+            rele_url=rele,
+            clave=clave_res,
+            puerto_api=puerto,
+            puerto_rele=puerto_rele,
+            iniciar_rele_local=iniciar_rele,
+            llama_bin=llama_bin,
+            espera_trabajadores=espera_trabajadores,
+            min_trabajadores=min_trabajadores,
+            threads=threads,
+            ctx_size=ctx_size,
+            paralelo=paralelo,
+            especulativa=especulativa,
+            espera_carga=espera_carga,
+            max_reinicios=reinicios,
+            modo=modo,
+            modelo_bytes=modelo_bytes,
+            motor_rele=motor_rele,
+            go_bin=go_bin,
+            ventana=ventana,
+            acierto=acierto,
+        )
+    except FileNotFoundError as e:
+        err_console.print(f"Error: {e}")
+        raise typer.Exit(code=1)
 
     try:
         asyncio.run(maestro.iniciar(duracion=duracion))

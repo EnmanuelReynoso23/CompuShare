@@ -16,7 +16,8 @@ import time
 from pathlib import Path
 
 from compushare.nodo import procesos
-from typing import Any
+from compushare.nodo.reenvio import Reenvio
+from typing import Any, Callable
 from urllib.parse import urlparse
 
 import httpx
@@ -34,6 +35,19 @@ BAJADA_POR_DEFECTO_MBPS = 10.0  # sin sonda: igual que la subida, por prudencia
 GAMMA_SIN_PREDECIR = 3  # sin ventana calculada: el --spec-draft-n-max por defecto de llama.cpp
 COSTO_BORRADOR_MTP = 0.28  # fracción de una pasada por palabra adivinada (docs/MATEMATICA.md, medido)
 ESPERA_SONDA_S = 15.0  # tiempo máximo para que el relé termine la sonda de banda de los tubos
+
+MODOS = ("auto", "completo", "capas")
+# Cuantas veces seguidas tiene que fallar /health del nodo completo antes de darlo por caido.
+FALLOS_COMPLETO_PARA_CAIDA = 3
+
+
+def es_completo(det: dict[str, Any]) -> bool:
+    """Un tubo `modo=completo` tiene el modelo entero; nunca va a --rpc."""
+    return (det.get("info") or {}).get("modo") == "completo"
+
+
+def sin_completos(tubos: dict[str, Any]) -> dict[str, Any]:
+    return {n: d for n, d in tubos.items() if not es_completo(d)}
 
 
 def buscar_binario(nombre: str, llama_bin: str | Path | None = None) -> Path:
@@ -152,10 +166,33 @@ class NodoMaestro:
         max_reinicios: int = 3,
         ventana: str | int = "auto",
         acierto: float = ACIERTO_POR_DEFECTO,
+
+        modo: str = "auto",
+        modelo_bytes: int | None = None,
+        motor_rele: str = "python",
+        go_bin: str | Path | None = None,
     ) -> None:
+        if modo not in MODOS:
+            raise ValueError(f"modo desconocido {modo!r}; usa {', '.join(MODOS)}")
+        if motor_rele not in ("python", "go"):
+            raise ValueError(f"motor_rele desconocido {motor_rele!r}; usa python o go")
+        # Con motor go el relé local es el binario compushare-rele (go/cmd/compushare-rele).
+        self.motor_rele = motor_rele
+        self.binario_rele_go: Path | None = (
+            procesos.buscar_binario_go("compushare-rele", go_bin) if motor_rele == "go" and iniciar_rele_local else None
+        )
+        self._rele_proc: subprocess.Popen[Any] | None = None
+        self.registro_rele: Path | None = None
+        self.modo = modo
         self.modelo = Path(modelo)
-        if not self.modelo.is_file():
+        # En modo completo el maestro no necesita el archivo: basta con el nombre (y el tamano, si se sabe).
+        if not self.modelo.is_file() and modo != "completo":
             raise FileNotFoundError(f"No existe el archivo de modelo: {self.modelo}")
+        self.modelo_bytes = self.modelo.stat().st_size if self.modelo.is_file() else modelo_bytes
+        # Lo que se esta usando ahora: "completo", "capas" o "ninguno" (aun no arranco).
+        self.modo_activo = "ninguno"
+        self._reenvio: Reenvio | None = None
+        self._fallos_completo = 0
         self.rele_url = rele_url
         self.clave = clave
         self.puerto_api = puerto_api
@@ -203,8 +240,34 @@ class NodoMaestro:
         self._rele_task: asyncio.Task[Any] | None = None
         self._detenido = False
 
+    async def _iniciar_rele_go(self) -> None:
+        """Lanza compushare-rele (Go) y comprueba que responde /salud con `tubos`, que es lo que lee el maestro."""
+        assert self.binario_rele_go is not None
+        cmd = [str(self.binario_rele_go), "--puerto", str(self.puerto_rele),
+               "--tubo-puerto-base", str(self.tubo_puerto_base)]
+        env = {**os.environ, "FABRIC_CLAVE": self.clave}  # la clave por el entorno, no en ps
+        self._rele_proc, self.registro_rele = procesos.lanzar(cmd, f"compushare-rele-{self.puerto_rele}", env)
+        fin = time.monotonic() + 10.0
+        async with httpx.AsyncClient() as client:
+            while time.monotonic() < fin:
+                if self._rele_proc.poll() is not None:
+                    raise RuntimeError(f"compushare-rele termino (codigo {self._rele_proc.returncode}): "
+                                       f"{procesos.cola_registro(self.registro_rele)}")
+                try:
+                    r = await client.get(f"http://127.0.0.1:{self.puerto_rele}/salud", timeout=1.0)
+                    if r.status_code == 200 and "tubos" in r.json():
+                        log.info("Rele Go local iniciado en puerto %d", self.puerto_rele)
+                        return
+                except Exception:
+                    pass
+                await asyncio.sleep(0.2)
+        raise RuntimeError(f"compushare-rele no respondio con /salud en el puerto {self.puerto_rele}")
+
     async def _iniciar_rele(self) -> None:
         """Inicia el rele WebSocket local si esta configurado."""
+        if self.motor_rele == "go":
+            await self._iniciar_rele_go()
+            return
         rele_mod.TUBO_PUERTO_BASE = self.tubo_puerto_base
         os.environ["TUBO_PUERTO_BASE"] = str(self.tubo_puerto_base)
         listo = asyncio.Event()
@@ -262,19 +325,76 @@ class NodoMaestro:
             costo_borrador=COSTO_BORRADOR_MTP if "draft-mtp" in tipos else 0.0,
         )
 
-    async def seleccionar_trabajadores(self) -> list[str]:
-        """Espera a los trabajadores y selecciona los optimos usando calculo.py y reparto.py."""
+    async def _esperar_tubos(self, listo: Callable[[dict[str, Any]], bool]) -> dict[str, Any]:
+        """Consulta /salud del relé hasta que `listo(tubos)` sea cierto o se acabe `espera_trabajadores`."""
         fin = time.monotonic() + self.espera_trabajadores
         tubos: dict[str, Any] = {}
         while time.monotonic() < fin:
             tubos = await self.obtener_tubos_registrados()
-            if len(tubos) >= max(1, self.min_trabajadores):
+            if listo(tubos):
                 break
             await asyncio.sleep(0.5)
+        return tubos
+
+    def _candidatos_completos(self, tubos: dict[str, Any]) -> list[tuple[str, int]]:
+        """Tubos `modo=completo` con el mismo modelo (nombre y, si se conoce, tamano en bytes)."""
+        candidatos: list[tuple[str, int]] = []
+        for nombre, det in tubos.items():
+            if not es_completo(det):
+                continue
+            info = det.get("info") or {}
+            if info.get("modelo") != self.modelo.name:
+                continue
+            if self.modelo_bytes is not None and info.get("modelo_bytes") != self.modelo_bytes:
+                continue
+            candidatos.append((nombre, int(det["puerto"])))
+        return candidatos
+
+    @staticmethod
+    async def _medir_salud(puerto: int, veces: int = 3) -> float | None:
+        """Ida y vuelta de GET /health por el puerto del tubo (la mejor de `veces`). None si no responde."""
+        mejor: float | None = None
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            for _ in range(veces):
+                t = time.perf_counter()
+                try:
+                    await client.get(f"http://127.0.0.1:{puerto}/health")
+                except Exception:
+                    break
+                ms = (time.perf_counter() - t) * 1000
+                mejor = ms if mejor is None else min(mejor, ms)
+        return mejor
+
+    async def _elegir_completo(self, tubos: dict[str, Any]) -> tuple[str, int] | None:
+        """El nodo completo que responde con menor ida y vuelta, o None."""
+        candidatos = self._candidatos_completos(tubos)
+        if not candidatos:
+            return None
+        medidas = await asyncio.gather(*(self._medir_salud(puerto) for _, puerto in candidatos))
+        validos = []
+        for (nombre, puerto), ms in zip(candidatos, medidas):
+            if ms is None:
+                log.warning("Nodo completo %s (puerto %d) no responde a /health", nombre, puerto)
+            else:
+                log.info("Nodo completo %s (puerto %d): ida y vuelta %.2f ms", nombre, puerto, ms)
+                validos.append((ms, nombre, puerto))
+        if not validos:
+            return None
+        _, nombre, puerto = min(validos)
+        return nombre, puerto
+
+    async def seleccionar_trabajadores(self, tubos: dict[str, Any] | None = None) -> list[str]:
+        """Espera a los trabajadores y selecciona los optimos usando calculo.py y reparto.py.
+        Los nodos completos no cuentan aqui: el reparto por capas solo usa tubos RPC."""
+        if tubos is None:
+            tubos = await self._esperar_tubos(
+                lambda t: len(sin_completos(t)) >= max(1, self.min_trabajadores)
+            )
+        tubos = sin_completos(tubos)
 
         log.info("Tubos registrados en rele: %d (%s)", len(tubos), list(tubos.keys()))
         if self.especulativa and self.ventana == "auto" and tubos:
-            tubos = await self._esperar_sonda(list(tubos.keys()))
+            tubos = sin_completos(await self._esperar_sonda(list(tubos.keys())))
 
         modelo_info = extraer_modelo_info(self.modelo)
         maestro_mem = detectar_memoria_maestro_gb()
@@ -459,24 +579,106 @@ class NodoMaestro:
         """llama-server se cayó (en general porque se cayó un trabajador): vuelve a elegir entre los tubos
         vivos y lo arranca de nuevo. Devuelve False si no lo logra."""
         self.reinicios += 1
-        cola = procesos.cola_registro(self.registro_server) if self.registro_server else ""
-        log.warning("llama-server se cayo (codigo %s), reinicio %d de %d. Ultimas lineas:\n%s",
-                    self.server_proc.returncode if self.server_proc else None, self.reinicios,
-                    self.max_reinicios, cola[-1500:])
-        # El trabajador puede estar relanzando su ggml-rpc-server: se reintenta durante `espera_recuperar`.
+        if self.modo_activo == "completo":
+            motivo = "el nodo completo dejo de responder"
+            cola = ""
+        else:
+            cola = procesos.cola_registro(self.registro_server) if self.registro_server else ""
+            motivo = f"llama-server se cayo (codigo {self.server_proc.returncode if self.server_proc else None})"
+        log.warning("%s, reinicio %d de %d. Ultimas lineas:\n%s",
+                    motivo, self.reinicios, self.max_reinicios, cola[-1500:])
+        # El trabajador puede estar relanzando su ggml-rpc-server (o su llama-server completo): se reintenta
+        # durante `espera_recuperar`.
         fin = time.monotonic() + self.espera_recuperar
         while True:
             try:
-                await self._arrancar_servidor(await self.seleccionar_trabajadores())
+                await self._arrancar()
+                self._fallos_completo = 0
                 return True
-            except (RuntimeError, TimeoutError, ValueError) as e:
-                if self.server_proc is not None and self.server_proc.poll() is None:
-                    self.server_proc.kill()
+            except (RuntimeError, TimeoutError, ValueError, OSError) as e:
+                self._parar_servidor()
                 if time.monotonic() >= fin:
-                    log.error("No se pudo relanzar llama-server: %s", e)
+                    log.error("No se pudo relanzar el servidor: %s", e)
                     return False
-                log.warning("Todavia no se puede relanzar llama-server (%s); otro intento en 10 s", e)
+                log.warning("Todavia no se puede relanzar el servidor (%s); otro intento en 10 s", e)
                 await asyncio.sleep(10)
+
+    def _parar_servidor(self) -> None:
+        """Mata llama-server (capas) si sigue vivo y suelta el reenvio del nodo completo."""
+        if self.server_proc is not None and self.server_proc.poll() is None:
+            self.server_proc.kill()
+        self._detener_reenvio()
+
+    def _detener_reenvio(self) -> None:
+        if self._reenvio is not None:
+            self._reenvio.detener()
+            self._reenvio = None
+
+    async def _arrancar_completo(self, nombre: str, puerto_tubo: int) -> None:
+        """Modo completo: el puerto de API del maestro reenvia al llama-server del trabajador (por su tubo)."""
+        self._detener_reenvio()
+        self._reenvio = Reenvio(self.puerto_api, puerto_tubo)
+        await self._reenvio.iniciar()
+        self.modo_activo = "completo"
+        log.info("Usando nodo completo %s: 127.0.0.1:%d -> tubo 127.0.0.1:%d", nombre, self.puerto_api, puerto_tubo)
+        if self.paralelo > 1:
+            log.warning("El paralelismo lo fija el trabajador completo (unirse --paralelo); "
+                        "--paralelo %d del maestro no llega a su llama-server", self.paralelo)
+        url_health = f"http://127.0.0.1:{self.puerto_api}/health"
+        fin = time.monotonic() + self.espera_carga
+        async with httpx.AsyncClient() as client:
+            while time.monotonic() < fin:
+                try:
+                    r = await client.get(url_health, timeout=2.0)
+                    if r.status_code == 200:
+                        log.info("Servidor listo en http://127.0.0.1:%d (nodo completo)", self.puerto_api)
+                        return
+                except Exception:
+                    pass
+                await asyncio.sleep(0.5)
+        raise TimeoutError(f"el nodo completo {nombre} no cargo el modelo tras {self.espera_carga:.0f} segundos")
+
+    async def _arrancar(self) -> None:
+        """Elige el modo y arranca. `auto`: nodo completo con el mismo modelo si lo hay (el de menor ida y
+        vuelta), y si no, reparto por capas. `completo` exige el nodo completo. `capas` es lo de siempre."""
+        self._detener_reenvio()
+        if self.modo == "capas":
+            self.modo_activo = "capas"
+            await self._arrancar_servidor(await self.seleccionar_trabajadores())
+            return
+
+        tubos = await self._esperar_tubos(
+            lambda t: bool(self._candidatos_completos(t))
+            or (self.modo == "auto" and len(sin_completos(t)) >= max(1, self.min_trabajadores))
+        )
+        elegido = await self._elegir_completo(tubos)
+        if elegido is not None:
+            await self._arrancar_completo(*elegido)
+            return
+        if self.modo == "completo":
+            raise RuntimeError(f"ningun nodo completo con {self.modelo.name} responde (tubos: {list(tubos)})")
+        log.info("No hay nodo completo con %s; reparto por capas", self.modelo.name)
+        self.modo_activo = "capas"
+        await self._arrancar_servidor(await self.seleccionar_trabajadores(tubos))
+
+    async def _completo_vivo(self) -> bool:
+        try:
+            async with httpx.AsyncClient() as client:
+                r = await client.get(f"http://127.0.0.1:{self.puerto_api}/health", timeout=3.0)
+                return r.status_code == 200
+        except Exception:
+            return False
+
+    async def _caido(self) -> bool:
+        """Si lo que sirve el maestro dejo de funcionar (llama-server local, o el nodo completo tras
+        FALLOS_COMPLETO_PARA_CAIDA chequeos seguidos sin /health)."""
+        if self.modo_activo == "completo":
+            if await self._completo_vivo():
+                self._fallos_completo = 0
+                return False
+            self._fallos_completo += 1
+            return self._fallos_completo >= FALLOS_COMPLETO_PARA_CAIDA
+        return self.server_proc is not None and self.server_proc.poll() is not None
 
     async def iniciar(self, duracion: float = 0.0) -> None:
         """Inicia el rele (si corresponde), selecciona tubos y arranca llama-server. Mientras corre, si
@@ -485,7 +687,7 @@ class NodoMaestro:
             await self._iniciar_rele()
 
         try:
-            await self._arrancar_servidor(await self.seleccionar_trabajadores())
+            await self._arrancar()
         except Exception:
             self.detener()
             raise
@@ -493,7 +695,11 @@ class NodoMaestro:
         try:
             fin = time.monotonic() + duracion if duracion > 0 else float("inf")
             while time.monotonic() < fin:
-                if self.server_proc is not None and self.server_proc.poll() is not None:
+                if self._rele_proc is not None and self._rele_proc.poll() is not None:
+                    log.error("compushare-rele (Go) termino (codigo %s). Ultimas lineas:\n%s",
+                              self._rele_proc.returncode, procesos.cola_registro(self.registro_rele, 1500))
+                    break
+                if await self._caido():
                     if self.reinicios >= self.max_reinicios or not await self._relanzar():
                         break
                 await asyncio.sleep(1.0)
@@ -501,10 +707,11 @@ class NodoMaestro:
             self.detener()
 
     def detener(self) -> None:
-        """Detiene llama-server y el rele local matando SOLO sus PIDs."""
+        """Detiene llama-server, el reenvio del nodo completo y el rele local matando SOLO sus PIDs."""
         if self._detenido:
             return
         self._detenido = True
+        self._detener_reenvio()
         if self.server_proc is not None and self.server_proc.poll() is None:
             pid = self.server_proc.pid
             log.info("Deteniendo llama-server PID %d", pid)
@@ -515,6 +722,7 @@ class NodoMaestro:
                 log.warning("llama-server PID %d no respondio a SIGTERM, enviando SIGKILL", pid)
                 self.server_proc.kill()
                 self.server_proc.wait(timeout=2)
+        procesos.terminar(self._rele_proc, "compushare-rele (Go)")
 
         if self._rele_task is not None:
             self._rele_task.cancel()
